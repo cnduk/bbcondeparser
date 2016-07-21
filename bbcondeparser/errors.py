@@ -1,0 +1,2 @@
+class BBCondeParseError(Exception):
+    pass
