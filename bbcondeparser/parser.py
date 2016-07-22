@@ -1,11 +1,10 @@
 import re
 
 from bbcondeparser.utils import to_unicode, normalize_newlines
-
+from bbcondeparser.tags import BaseTag, ErrorText, RawText
 
 TAG_START = 'tag_start'
 TAG_END = 'tag_end'
-
 
 def parse_tree(raw_text, tags):
     """`raw_text` is the raw bb code (conde format) to be parsed
@@ -14,26 +13,114 @@ def parse_tree(raw_text, tags):
     raw_text = to_unicode(raw_text)
     raw_text = normalize_newlines(raw_text)
     tag_dict = create_tag_dict(tags)
-    
 
-    stack = []
+    stack = [] # stack of (tree, tag_dict, tag_cls, tag_attrs, tag_open_text)
     tree = []
 
     curr_pos = 0
     while curr_pos < len(raw_text):
-        pass
+        last_pos = curr_pos
+
+        if stack and stack[-1][2].close_on_newline:
+            curr_pos = find_next_multi_char(raw_text, '[\n', curr_pos)
+
+        else:
+            curr_pos = raw_text.find('[', curr_pos)
+
+        if curr_pos == -1:
+            # No more open/close tags
+            tree.append(RawText(raw_text[last_pos:]))
+            break
+
+        if curr_pos > last_pos: # We've scanned past some text
+            tree.append(RawText(raw_text[last_pos:curr_pos]))
+
+        if stack and stack[-1][2].close_on_newline and raw_text[curr_pos] == '\n':
+            tag_tree = tree
+
+            tree, tag_dict, tag_cls, tag_attrs, tag_text = stack.pop()
+            tree.append(tag_cls(tag_attrs, tag_tree, tag_text, '\n'))
+            curr_pos += 1
+
+            continue
 
 
-_attr_name_re_str = '[a-zA-Z-]+'
+        #TODO disallow newlines in middle of tags?
+        next_close = raw_text.find(']', curr_pos)
+        if next_close == -1:
+            tree.append(ErrorText(raw_text[curr_pos:]))
+            break
+
+        else:
+            tag_info = parse_tag(raw_text[curr_pos+1:next_close])
+            if tag_info is None:
+                tree.append(ErrorText(raw_text[curr_pos:next_close+1]))
+                curr_pos = next_close + 1
+                continue
+
+            tag_open_close, tag_name, tag_attrs = tag_info
+            tag_cls = tag_dict.get(tag_name, None)
+
+            if tag_cls is None:
+                tree.append(ErrorText(raw_text[curr_pos:next_close+1]))
+                curr_pos = next_close + 1
+                continue
+
+            if tag_open_close == TAG_START:
+                if tag_cls.self_closing:
+                    tree.append(tag_cls(tag_attrs, [], raw_text[curr_pos:next_close+1], ''))
+                    curr_pos = next_close + 1
+                    continue
+
+                stack.append((
+                    tree, tag_dict, tag_cls, tag_attrs,
+                    raw_text[curr_pos: next_close+1]
+                ))
+                tree = []
+
+                if tag_cls.tag_set:
+                    tag_dict = create_tag_dict(tag_cls.tag_set)
+
+                curr_pos = next_close + 1
+                continue
+
+
+            # tag_open_close == TAG_END
+            if not stack or tag_name != stack[-1][2].tag_name:
+                tree.append(ErrorText(raw_text[curr_pos:next_close+1]))
+                curr_pos = next_close + 1
+                continue
+
+            tag_tree = tree
+            try:
+                tree, tag_dict, tag_cls, tag_attrs, tag_text = stack.pop()
+            except IndexError:
+                tree.append(ErrorText(raw_text[curr_pos:next_close+1]))
+                curr_pos = next_close + 1
+                continue
+
+            tree.append(tag_cls(tag_attrs, tag_tree, tag_text, raw_text[curr_pos:next_close+1]))
+            curr_pos = next_close + 1
+
+    while stack:
+        # Things have gone wrong here, there are un-closed tags.
+        curr_tree = tree
+        tree, tag_dict, tag_cls, tag_attrs, tag_text = stack.pop()
+
+        tree = tree + [ErrorText(tag_text)] + curr_tree
+
+    return tree
+
 _whitespace_re = re.compile('\s*')
-# end tags should just be a / and tag name
-_end_tag_re = re.compile('^/{_attr_name_re_str}$'.format(locals()))
-_attr_re_str = ( # <attr_name>="<attr_val>"
-    r'{_attr_name_re_str}' # <attr_name>
-    r'="' # ="
-    r'(?:(?:[^\\"]|\\.)*)' # Inbetween the "s, can have anything which isn't
-    r'"' # "
-).format(locals())
+
+_tag_name_re_str = '[a-zA-Z-]+'
+_end_tag_re = re.compile('^/{_tag_name_re_str}$'.format(**locals()))
+_start_tag_name_re = re.compile('^{_tag_name_re_str}$'.format(**locals()))
+
+_attr_re_str = r'([a-zA-Z-]+)="((?:[^\\"]|\\.)*)"'
+_attr_re = re.compile(_attr_re_str)
+_attrs_re = re.compile(r'^(?:\s*{_attr_re_str}\s*)*$'.format(**locals()))
+
 def parse_tag(text):
     """`text` should be the text from within the tag
         e.g:
@@ -45,29 +132,61 @@ def parse_tag(text):
             start/end is either parser.TAG_START or parser.TAG_END,
                 indicating if it's a starting tag or end tag.
             name is the name of the tag
-            attrs is any attributes defined
+            attrs is any attributes defined as a tuple of two-tuples
                 (on an open tag only, None on end tags)
         returns None on a failed parse
     """
     if text[0] == '/':
-        if _end_rag_re.match(text[1:]):
+        if _end_tag_re.match(text):
             return (TAG_END, text[1:], None)
         else:
             return None
 
     parts = _whitespace_re.split(text, maxsplit=1)
     tag_name = parts[0]
-    attrs = parts[1] if len(parts) == 2 else ''
+    attrs_str = parts[1] if len(parts) == 2 else ''
 
+    if not (_start_tag_name_re.match(tag_name) and _attrs_re.match(attrs_str)):
+        return None
+
+    attr_vals = []
+    # Python's re module doesn't have a way to say "return multiple items if
+    # a group matches more than once". So pass a closure into re.sub() for the
+    # repl argument, to populate attrs_dict as it discovers it.
+    def catch_attrs(match):
+        attr_name, attr_val = match.groups()
+        attr_val = attr_val.replace('\\', '')
+        attr_vals.append((attr_name, attr_val))
+        return '' # re.sub() expects the replacement string
+
+    _attr_re.sub(catch_attrs, attrs_str)
+
+    return (TAG_START, tag_name, tuple(attr_vals))
 
 
 def create_tag_dict(tags):
-    tag_dict = {
-        tag.tag_name: tag
-        for tag in tags
-    }
+    tag_dict = {}
 
-    if len(tags) != len(tag_dict):
-        raise RuntimeError("Duplicate tag names detected")
+    for tag in tags:
+        if tag.tag_name in tag_dict:
+            # Be nice, if the same tag has been passed more than once
+            # then just accept it - the behaviour is all the same.
+            if tag_dict[tag.tag_name] is not tag:
+                raise RuntimeError("Duplicate tag names detected")
+
+        tag_dict[tag.tag_name] = tag
 
     return tag_dict
+
+
+def find_next_multi_char(search_string, chars, start=0):
+    matches = list(
+        match
+        for match in (
+            search_string.find(char, start)
+            for char in chars
+        )
+        if match >= 0
+    )
+
+    return min(matches) if matches else -1

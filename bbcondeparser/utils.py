@@ -1,4 +1,5 @@
 import sys
+import re
 
 def normalize_newlines(text):
     """Tidies up newlines in the block of text
@@ -47,9 +48,13 @@ if sys.version_info.major == '2':
         else:
             #TODO might need to be more resilient, rather than just rely
             # on the data being utf-8 compatible
-            return string.decode('utf-8')
+            return string_like_object.decode('utf-8')
 else:
     def to_unicode(string_like_object):
         """Under python>=3, this function does nothing
         """
         return string_like_object
+
+def escape_html(text):
+    #TODO
+    return text
