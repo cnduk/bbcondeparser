@@ -1,12 +1,16 @@
 import re
 
-from bbcondeparser.utils import to_unicode, normalize_newlines
+from bbcondeparser.utils import (
+    to_unicode, normalize_newlines, remove_backslash_escapes
+)
 from bbcondeparser.tags import BaseTag, ErrorText, RawText
 
 TAG_START = 'tag_start'
 TAG_END = 'tag_end'
 
-def parse_tree(raw_text, tags):
+def parse_tree(
+    raw_text, tags, raw_text_class=RawText, error_text_class=ErrorText
+):
     """`raw_text` is the raw bb code (conde format) to be parsed
         `tags` should be an iterable of tag classes allowed in the text
     """
@@ -48,25 +52,31 @@ def parse_tree(raw_text, tags):
         #TODO disallow newlines in middle of tags?
         next_close = raw_text.find(']', curr_pos)
         if next_close == -1:
-            tree.append(ErrorText(raw_text[curr_pos:]))
+            tree.append(ErrorText(
+                raw_text[curr_pos:], "Missing tag close ']'"
+            ))
             break
 
         else:
             tag_info = parse_tag(raw_text[curr_pos+1:next_close])
             if tag_info is None:
-                tree.append(ErrorText(raw_text[curr_pos:next_close+1]))
+                tree.append(ErrorText(
+                    raw_text[curr_pos:next_close+1], "Invalid tag syntax"
+                ))
                 curr_pos = next_close + 1
                 continue
 
             tag_open_close, tag_name, tag_attrs = tag_info
             tag_cls = tag_dict.get(tag_name, None)
 
-            if tag_cls is None:
-                tree.append(ErrorText(raw_text[curr_pos:next_close+1]))
+            if tag_cls is None and (not stack or stack[-1][2].tag_name != tag_name):
+                tree.append(ErrorText(
+                    raw_text[curr_pos:next_close+1], "unknown tag"
+                ))
                 curr_pos = next_close + 1
                 continue
 
-            if tag_open_close == TAG_START:
+            if tag_cls is not None and tag_open_close == TAG_START:
                 if tag_cls.self_closing:
                     tree.append(tag_cls(tag_attrs, [], raw_text[curr_pos:next_close+1], ''))
                     curr_pos = next_close + 1
@@ -79,7 +89,11 @@ def parse_tree(raw_text, tags):
                 tree = []
 
                 if tag_cls.tag_set:
-                    tag_dict = create_tag_dict(tag_cls.tag_set)
+                    tag_dict = {
+                        tag_name: tag_cls.null_class
+                        for tag_name, tag_cls in tag_dict.items()
+                    }
+                    tag_dict.update(create_tag_dict(tag_cls.tag_set))
 
                 curr_pos = next_close + 1
                 continue
@@ -87,17 +101,17 @@ def parse_tree(raw_text, tags):
 
             # tag_open_close == TAG_END
             if not stack or tag_name != stack[-1][2].tag_name:
-                tree.append(ErrorText(raw_text[curr_pos:next_close+1]))
+                tree.append(ErrorText(
+                    raw_text[curr_pos:next_close+1],
+                    "Close tag does not match current open tag '{}'".format(
+                        (stack[-1][2].tag_name if stack else '<None>'),
+                    )
+                ))
                 curr_pos = next_close + 1
                 continue
 
             tag_tree = tree
-            try:
-                tree, tag_dict, tag_cls, tag_attrs, tag_text = stack.pop()
-            except IndexError:
-                tree.append(ErrorText(raw_text[curr_pos:next_close+1]))
-                curr_pos = next_close + 1
-                continue
+            tree, tag_dict, tag_cls, tag_attrs, tag_text = stack.pop()
 
             tree.append(tag_cls(tag_attrs, tag_tree, tag_text, raw_text[curr_pos:next_close+1]))
             curr_pos = next_close + 1
@@ -107,9 +121,10 @@ def parse_tree(raw_text, tags):
         curr_tree = tree
         tree, tag_dict, tag_cls, tag_attrs, tag_text = stack.pop()
 
-        tree = tree + [ErrorText(tag_text)] + curr_tree
+        tree = tree + [ErrorText(tag_text, "Missing close tag")] + curr_tree
 
     return tree
+
 
 _whitespace_re = re.compile('\s*')
 
@@ -152,12 +167,12 @@ def parse_tag(text):
     attr_vals = []
     # Python's re module doesn't have a way to say "return multiple items if
     # a group matches more than once". So pass a closure into re.sub() for the
-    # repl argument, to populate attrs_dict as it discovers it.
+    # repl argument, to populate attrs_dict as it discovers matches to sub.
     def catch_attrs(match):
         attr_name, attr_val = match.groups()
-        attr_val = attr_val.replace('\\', '')
+        attr_val = remove_backslash_escapes(attr_val)
         attr_vals.append((attr_name, attr_val))
-        return '' # re.sub() expects the replacement string
+        return '' # re.sub() expects a replacement string
 
     _attr_re.sub(catch_attrs, attrs_str)
 

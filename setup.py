@@ -8,5 +8,5 @@ setup(
     author_email='condenet.technical@condenast.co.uk',
     description="parser for Conde Nast BBCode",
     packages=find_packages(),
-    install_requires=[],
+    install_requires=['six'],
 )

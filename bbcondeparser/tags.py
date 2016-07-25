@@ -1,3 +1,5 @@
+import six
+
 from bbcondeparser.utils import escape_html
 from bbcondeparser.errors import BBCondeParseError
 
@@ -39,13 +41,31 @@ class ErrorText(BaseText):
         super(ErrorText, self).__init__(text)
         self.reason = reason
 
-#    def __repr__(self):
-#        #HERE TODO
+    def __repr__(self):
+        return "{}('{}': {})".format(
+            self.__class__.__name__, self.reason, repr(self.get_raw()),
+        )
 
     def render(self):
         return self.get_raw()
 
 
+class BaseTagMeta(type):
+    def __new__(cls, name, bases, ctx):
+        def render(self):
+            return self.render_children()
+
+        null_name = 'Null{}'.format(name)
+        null_ctx = dict(ctx)
+        null_ctx['render'] = render
+        new_null_cls = super(BaseTagMeta, cls).__new__(
+                cls, null_name, bases, null_ctx)
+
+        ctx['null_class'] = new_null_cls
+        return super(BaseTagMeta, cls).__new__(cls, name, bases, ctx)
+
+
+@six.add_metaclass(BaseTagMeta)
 class BaseTag(object):
     # These attributes are for the parsers to discern behavour.
     tag_name = None # what goes between the []s
@@ -78,17 +98,37 @@ class BaseTag(object):
         self.start_text = start_text
         self.end_text = end_text
 
-        self.attrs = self.parse_attrs(attrs)
+        self.parse_attrs(attrs)
 
     def __repr__(self):
         return '{}({}: {})'.format(
             self.__class__.__name__, self.tag_name, self.attrs
         )
 
+    def pretty_print(self):
+        indent = ' ' * 4
+
+        child_fmts = []
+        for child in self.tree:
+            child_fmts.append(getattr(child, 'pretty_print', child.__repr__)())
+
+        fmt_child_list = '\n'.join(
+            '{}{}'.format(indent, line)
+            for child_text in child_fmts
+            for line in child_text.split('\n')
+        )
+
+        if len(fmt_child_list):
+            fmt_child_list = '\n' + fmt_child_list + '\n'
+
+        return '{}({} tree({}) {} {{{}}})'.format(
+            self.__class__.__name__, self.start_text, fmt_child_list,
+            self.end_text, self.attrs
+        )
+
     @classmethod
     def parse_attrs(cls, attrs):
-        given_attrs = dict(attrs)
-        parsed_attrs = {}
+        self.attrs = parsed_attrs = {}
 
         for attr_def in cls.attr_defs:
             attr_name, parser = attr_def[:2]
@@ -128,6 +168,7 @@ class BaseTag(object):
     def get_children_raw(self):
         return ''.join(child.get_raw() for child in self.tree)
 
+
 class BaseSimpleTag(BaseTag):
     # use one '{{ body }}' to be replaced with the contents
     # of the items children
@@ -141,16 +182,3 @@ class BaseSimpleTag(BaseTag):
                     self.__class__.__name__))
 
         return self.template.replace(self.replace_text, self.render_children())
-
-###############################################################################
-# Tag definitions
-###############################################################################
-class CodeTag(BaseTag):
-    tag_name = 'code'
-    def _render(self):
-        return '<pre><code>{}</code></pre>'.format(self.get_children_raw())
-
-
-class BoldTag(BaseSimpleTag):
-    tag_name = 'b'
-    template = '<strong>{{ body }}</strong>'

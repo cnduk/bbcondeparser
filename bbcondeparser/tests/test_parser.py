@@ -1,7 +1,7 @@
 import unittest
 
 from bbcondeparser.tags import RawText, ErrorText, BaseTag
-from bbcondeparser import parser
+from bbcondeparser import tree_parser
 
 
 class MockBaseTag(BaseTag):
@@ -16,10 +16,8 @@ class MockBaseTag(BaseTag):
         return self.__init_with == other.__init_with
 
     def __repr__(self):
-        return "MockBaseTag({}, {})".format(
-            super(MockBaseTag, self).__repr__(),
-            str(self.__init_with)
-        )
+        return self.pretty_print()
+
 
 class TestFindNextMultiChar(unittest.TestCase):
     def test_case_1(self):
@@ -28,7 +26,7 @@ class TestFindNextMultiChar(unittest.TestCase):
 
         expected = 5
 
-        result = parser.find_next_multi_char(input, chars)
+        result = tree_parser.find_next_multi_char(input, chars)
 
         self.assertEqual(expected, result)
 
@@ -39,7 +37,7 @@ class TestFindNextMultiChar(unittest.TestCase):
 
         expected = 8
 
-        result = parser.find_next_multi_char(input, chars, start)
+        result = tree_parser.find_next_multi_char(input, chars, start)
 
         self.assertEqual(expected, result)
 
@@ -49,7 +47,7 @@ class TestFindNextMultiChar(unittest.TestCase):
 
         expected = -1
 
-        result = parser.find_next_multi_char(input, chars)
+        result = tree_parser.find_next_multi_char(input, chars)
 
         self.assertEqual(expected, result)
 
@@ -59,9 +57,9 @@ class TestFindNextMultiChar(unittest.TestCase):
 class TestParseTag(unittest.TestCase):
     def test_close_tag(self):
         input = '/banana'
-        expected = parser.TAG_END, 'banana', None
+        expected = tree_parser.TAG_END, 'banana', None
 
-        result = parser.parse_tag(input)
+        result = tree_parser.parse_tag(input)
 
         self.assertEqual(expected, result)
 
@@ -69,15 +67,15 @@ class TestParseTag(unittest.TestCase):
         input = "/This isn't a close tag!"
         expected = None
 
-        result = parser.parse_tag(input)
+        result = tree_parser.parse_tag(input)
 
         self.assertEqual(expected, result)
 
     def test_open_no_attrs(self):
         input = 'an-open-tag'
-        expected = parser.TAG_START, 'an-open-tag', ()
+        expected = tree_parser.TAG_START, 'an-open-tag', ()
 
-        result = parser.parse_tag(input)
+        result = tree_parser.parse_tag(input)
 
         self.assertEqual(expected, result)
 
@@ -88,9 +86,9 @@ class TestParseTag(unittest.TestCase):
             ('attr-b', 'apple'),
             ('attr-b', r'this is a " double quote'),
         )
-        expected = parser.TAG_START, 'an-open-tag', expected_attrs
+        expected = tree_parser.TAG_START, 'an-open-tag', expected_attrs
 
-        result = parser.parse_tag(input)
+        result = tree_parser.parse_tag(input)
 
         self.assertEqual(expected, result)
 
@@ -98,7 +96,7 @@ class TestParseTag(unittest.TestCase):
         input = 'a borked open tag'
         expected = None
 
-        result = parser.parse_tag(input)
+        result = tree_parser.parse_tag(input)
 
         self.assertEqual(expected, result)
 
@@ -106,7 +104,7 @@ class TestParseTag(unittest.TestCase):
         input = 'an-open-tag this="good" this="is" not=\'good\''
         expected = None
 
-        result = parser.parse_tag(input)
+        result = tree_parser.parse_tag(input)
 
         self.assertEqual(expected, result)
 
@@ -125,7 +123,7 @@ class TestCreateTagDict(unittest.TestCase):
         input = [Tag1, Tag2, Tag3, Tag2] # Duplicates are accepted
         expected = {'apples': Tag1, 'bananas': Tag2, 'oranges': Tag3}
 
-        result = parser.create_tag_dict(input)
+        result = tree_parser.create_tag_dict(input)
 
         self.assertEqual(expected, result)
 
@@ -142,17 +140,19 @@ class TestCreateTagDict(unittest.TestCase):
         input = [Tag1, Tag2, Tag3]
 
         with self.assertRaises(RuntimeError):
-            parser.create_tag_dict(input)
+            tree_parser.create_tag_dict(input)
 
 
 class TestParseTree(unittest.TestCase):
+    maxDiff = None
+
     def test_only_text(self):
         input_text = "Hello, World!"
         tags = []
 
         expected_tree = [RawText("Hello, World!")]
 
-        result = parser.parse_tree(input_text, tags)
+        result = tree_parser.parse_tree(input_text, tags)
 
         self.assertEqual(expected_tree, result)
 
@@ -173,7 +173,7 @@ class TestParseTree(unittest.TestCase):
             ),
         ]
 
-        result = parser.parse_tree(input_text, tags)
+        result = tree_parser.parse_tree(input_text, tags)
 
         self.assertEqual(expected_tree, result)
 
@@ -194,7 +194,7 @@ class TestParseTree(unittest.TestCase):
             )
         ]
 
-        result = parser.parse_tree(input_text, tags)
+        result = tree_parser.parse_tree(input_text, tags)
 
         self.assertEqual(expected_tree, result)
 
@@ -211,7 +211,7 @@ class TestParseTree(unittest.TestCase):
             RawText('This is some lovely text!'),
         ]
 
-        result = parser.parse_tree(input_text, tags)
+        result = tree_parser.parse_tree(input_text, tags)
 
         self.assertEqual(expected_tree, result)
 
@@ -237,11 +237,11 @@ class TestParseTree(unittest.TestCase):
             )
         ]
 
-        result = parser.parse_tree(input_text, tags)
+        result = tree_parser.parse_tree(input_text, tags)
 
         self.assertEqual(expected_tree, result)
 
-    def test_customer_tag_set(self):
+    def test_custom_tag_set(self):
         class InnerTag(MockBaseTag):
             tag_name = 'inner'
 
@@ -259,8 +259,8 @@ class TestParseTree(unittest.TestCase):
                     InnerTag(
                         (),
                         [RawText('Hello!')],
-                        '[inner1]',
-                        '[/inner1]',
+                        '[inner]',
+                        '[/inner]',
                     )
                 ],
                 '[banana]',
@@ -268,30 +268,104 @@ class TestParseTree(unittest.TestCase):
             )
         ]
 
-        result = parser.parse_tree(input_text, tags)
+        result = tree_parser.parse_tree(input_text, tags)
+
+        self.assertEqual(expected_tree, result)
+
+    def test_tag_no_close_brace(self):
+        input_text = '[imgoingtobreak'
+        tags = []
+
+        expected_tree = [ErrorText('[imgoingtobreak')]
+
+        result = tree_parser.parse_tree(input_text, tags)
+
+        self.assertEqual(expected_tree, result)
+
+    def test_bad_tag_syntax(self):
+        input_text = '[this is really broken!]'
+        tags = []
+
+        expected_tree = [ErrorText('[this is really broken!]')]
+
+        result = tree_parser.parse_tree(input_text, tags)
+
+        self.assertEqual(expected_tree, result)
+
+    def test_close_not_opened_tag(self):
+        class Tag1(BaseTag):
+            tag_name = 'apple'
+
+        input_text = '[/apple]'
+        tags = [Tag1]
+
+        expected_tree = [ErrorText('[/apple]')]
+
+        result = tree_parser.parse_tree(input_text, tags)
 
         self.assertEqual(expected_tree, result)
 
     def test_custom_tag_set_complex(self):
-        #TODO
-        self.skipTest("notimplemented")
         class InnerTag1(MockBaseTag):
-            tag_name = 'inner_1'
+            tag_name = 'inner-a'
 
         class InnerTag2(MockBaseTag):
-            tag_name = 'inner_2'
+            tag_name = 'inner-b'
             self_closing = True
 
         class OuterTag1(MockBaseTag):
-            tag_name = 'outer_banana'
+            tag_name = 'outer-banana'
             tag_set = [InnerTag1, InnerTag2]
 
         class OuterTag2(MockBaseTag):
-            tag_name = 'outer_apple'
+            tag_name = 'outer-apple'
             tag_set = [InnerTag1]
 
         tags = [OuterTag1, OuterTag2]
-        input_text = ''
+        # Text written like this so that don't have to deal with loads of newlines
+        input_text = (
+            '[outer-banana]'
+                '[inner-a]Hello[/inner-a]'
+                '[inner-b]'
+                '[outer-banana]fail[/outer-banana]'
+                '[outer-apple]also fail[/outer-apple]'
+            '[/outer-banana]'
+            '[outer-apple]'
+                '[inner-a]This works![/inner-a]'
+                '[inner-b]'
+                '[outer-banana]also also also fail[/outer-banana]'
+                '[outer-apple]applefail[/outer-apple]'
+            '[/outer-apple]'
+            '[inner-a]Should be inside something![/inner-a]'
+            '[inner-b]'
+        )
+
+        expected_tree = [
+            OuterTag1((),
+                [
+                    InnerTag1((),[RawText("Hello")],'[inner-a]','[/inner-a]'),
+                    InnerTag2((),[],'[inner-b]',''),
+                    OuterTag1.null_class((), [RawText('fail')], '[outer-banana]', '[/outer-banana]'),
+                    OuterTag2.null_class((), [RawText('also fail')], '[outer-apple]', '[/outer-apple]'),
+                ],
+                '[outer-banana]','[/outer-banana]',
+            ),
+           OuterTag2((),
+                [
+                    InnerTag1((),[RawText("This works!")],'[inner-a]','[/inner-a]'),
+                    ErrorText('[inner-b]'),
+                    OuterTag1.null_class((), [RawText('also also also fail')], '[outer-banana]', '[/outer-banana]'),
+                    OuterTag2.null_class((), [RawText('applefail')], '[outer-apple]', '[/outer-apple]'),
+                ],
+                '[outer-apple]','[/outer-apple]',
+            ),
+            ErrorText('[inner-a]'), RawText('Should be inside something!'), ErrorText('[/inner-a]'),
+            ErrorText('[inner-b]'),
+        ]
+
+        result = tree_parser.parse_tree(input_text, tags)
+
+        self.assertEqual(expected_tree, result)
 
     def test_generic_1(self):
         class Tag1(MockBaseTag):
@@ -315,6 +389,6 @@ class TestParseTree(unittest.TestCase):
             )
         ]
 
-        result = parser.parse_tree(input_text, tags)
+        result = tree_parser.parse_tree(input_text, tags)
 
         self.assertEqual(expected_tree, result)

@@ -1,44 +1,24 @@
 import sys
 import re
+import cgi
 
+_normalize_multi_newlines_re = re.compile('\n{3,}')
 def normalize_newlines(text):
     """Tidies up newlines in the block of text
     \r = CR (Carriage Return) - Used as a new line character in Mac OS before X
     \n = LF (Line Feed) - Used as a new line character in Unix/Mac OS X
     \r\n = CR + LF - Used as a new line character in Windows
     """
-    # Replace all single \r with \n
-    transformed_text = text.replace('\r[^\n]', '\n')
     # Replace all \r\n newlines with \n
     # \r\n is a single newline on windows
-    transformed_text = transformed_text.replace('\r\n', '\n')
+    transformed_text = text.replace('\r\n', '\n')
+
     # Replace any \n\n\n+ into just twos
-    transformed_text = re.sub(r'\n{3,}', '\n\n', transformed_text)
+    transformed_text = _normalize_multi_newlines_re.sub('\n\n', transformed_text)
     return transformed_text
 
 
-# Dan wanted this in here... He says it's "performant"
-def trim_whitespace(text, whitespace=False):
-    '''
-    This function trims the whitespace from some text. You pass it text and it
-    removes it. For example:
-    butts  to butts
-    '''
-    def _ltrim(text):
-        '''This removes the left whitespace from text'''
-        return text.lstrip()
-
-    def _rtrim(text):
-        '''This removes the right whitespace from text'''
-        return text.tstrip()
-
-    if not whitespace:
-        return text
-
-    return '{z}'.format(z=_rtrim('%s' % _ltrim(text)))
-
-
-if sys.version_info.major == '2':
+if sys.version_info.major == 2:
     def to_unicode(string_like_object):
         """Convert the item to unicode, so we're dealing
             with characters and not bytes.
@@ -55,6 +35,16 @@ else:
         """
         return string_like_object
 
+
 def escape_html(text):
-    #TODO
-    return text
+    return cgi.escape(text, quote=True)
+
+
+_backslash_sub_re = re.compile(r'(\\.)')
+def _replace_backslash_sub(match):
+    # our regex will only match 2 characters, a backslash and some character
+    # we just want to replace the two characters with whatever the second character is.
+    return match.groups()[0][1]
+
+def remove_backslash_escapes(text):
+    return _backslash_sub_re.sub(_replace_backslash_sub, text)
