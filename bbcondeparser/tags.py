@@ -126,11 +126,10 @@ class BaseTag(object):
             self.end_text, self.attrs
         )
 
-    @classmethod
-    def parse_attrs(cls, attrs):
+    def parse_attrs(self, attrs):
         self.attrs = parsed_attrs = {}
 
-        for attr_def in cls.attr_defs:
+        for attr_def in self.attr_defs:
             attr_name, parser = attr_def[:2]
             default = attr_def[2] if len(attr_def) == 3 else REQUIRED
 
@@ -140,7 +139,7 @@ class BaseTag(object):
             if val is REQUIRED:
                 raise BBCondeParseError(
                         '{} is is a required attribute for {}'.format(
-                        cls.attr_name, cls.tag_name))
+                        self.attr_name, self.tag_name))
 
             parsed_val = parser(val) if parser is not None else val
             parsed_attrs[attr_name] = parsed_val
