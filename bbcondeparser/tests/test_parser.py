@@ -1,6 +1,6 @@
 import unittest
 
-from bbcondeparser.tags import RawText, ErrorText, BaseTag
+from bbcondeparser.tags import RawText, ErrorText, BaseTag, BaseText
 from bbcondeparser import tree_parser
 
 
@@ -305,6 +305,16 @@ class TestParseTree(unittest.TestCase):
 
         self.assertEqual(expected_tree, result)
 
+    def test_empty_tag(self):
+        input_text = '[]'
+        tags = []
+
+        expected_tree = [ErrorText('[]')]
+
+        result = tree_parser.parse_tree(input_text, tags)
+
+        self.assertEqual(expected_tree, result)
+
     def test_custom_tag_set_complex(self):
         class InnerTag1(MockBaseTag):
             tag_name = 'inner-a'
@@ -392,3 +402,40 @@ class TestParseTree(unittest.TestCase):
         result = tree_parser.parse_tree(input_text, tags)
 
         self.assertEqual(expected_tree, result)
+
+
+class TestTreeParser(unittest.TestCase):
+    def test_parser(self):
+        class Bold(BaseTag):
+            tag_name = 'b'
+            def _render(self):
+                return '<b>{}</b>'.format(self.render_children())
+
+        class Italic(BaseTag):
+            tag_name = 'i'
+            def _render(self):
+                return '<i>{}</i>'.format(self.render_children())
+
+        class ToBeIgnored(BaseTag):
+            tag_name = 'ignored'
+            def _render(self):
+                return "I SHOULD HAVE BEEN IGNORED"
+
+        class UpperCaseText(BaseText):
+            def render(self):
+                return self.get_raw().upper()
+
+        input_text = "[b][i][ignored]It's not a tumor![/ignored][/i][/b]"
+
+        expected_text = "<b><i>IT'S NOT A TUMOR!</i></b>"
+
+        class TestParser(tree_parser.BaseTreeParser):
+            tags = [Bold, Bold, Italic]
+            ignored_tags = [ToBeIgnored]
+
+            raw_text_class = UpperCaseText
+
+        inst = TestParser(input_text)
+        result_text = inst.render()
+
+        self.assertEqual(expected_text, result_text)

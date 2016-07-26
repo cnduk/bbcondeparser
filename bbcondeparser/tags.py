@@ -3,15 +3,21 @@ import six
 from bbcondeparser.utils import escape_html
 from bbcondeparser.errors import BBCondeParseError
 
-class REQUIRED(object): pass
-
 
 class BaseText(object):
+    """This class is to hold chunks of plain text. This
+        class handles escaping html within the text.
+    """
     def __init__(self, text):
         self.text = text
 
-    def render(self):
-        raise NotImplementedError
+    def render(self, escape=True):
+        text = self.get_raw()
+
+        if escape:
+            text = escape_html(text)
+
+        return text
 
     def __eq__(self, other):
         return self.__class__ == other.__class__ and self.text == other.text
@@ -22,18 +28,12 @@ class BaseText(object):
     def get_raw(self):
         return self.text
 
+    def render_raw(self):
+        return self.render()
+
 
 class RawText(BaseText):
-    """This class is to hold chunks of plain text. This
-        class handles escaping html within the text.
-    """
-    def render(self, escape=True):
-        text = self.get_raw()
-
-        if escape:
-            text = escape_html(text)
-
-        return text
+    pass
 
 
 class ErrorText(BaseText):
@@ -45,9 +45,6 @@ class ErrorText(BaseText):
         return "{}('{}': {})".format(
             self.__class__.__name__, self.reason, repr(self.get_raw()),
         )
-
-    def render(self):
-        return self.get_raw()
 
 
 class BaseTagMeta(type):
@@ -61,8 +58,12 @@ class BaseTagMeta(type):
         new_null_cls = super(BaseTagMeta, cls).__new__(
                 cls, null_name, bases, null_ctx)
 
-        ctx['null_class'] = new_null_cls
-        return super(BaseTagMeta, cls).__new__(cls, name, bases, ctx)
+        new_cls = super(BaseTagMeta, cls).__new__(cls, name, bases, ctx)
+
+        new_cls.null_class = new_null_cls
+        new_null_cls.null_class = new_null_cls
+
+        return new_cls
 
 
 @six.add_metaclass(BaseTagMeta)
@@ -78,12 +79,12 @@ class BaseTag(object):
 
     # defines what attributes are allowed, their parsers and default values.
     # required attributes should not define a third option for default
-    attr_defs = tuple()
+    attr_defs = {}
     # e.g.
-    # attrs = (
-    #   ('banana_size', int), # required attr called banana_size, parsed using int()
-    #   ('apple_color', None, 'red'), # optional attr called apple_color, defaults to 'red'
-    # )
+    # attrs = {
+    #   'banana_size': {'parser': int}, # required attr called banana_size, parsed using int()
+    #   'apple_color': {'default': 'red'}, # optional attr called apple_color, defaults to 'red'
+    # }
 
     # These attributes are about the formating of output text
     #TODO implement convert_newlines, remove_paragraphs
@@ -98,6 +99,7 @@ class BaseTag(object):
         self.start_text = start_text
         self.end_text = end_text
 
+        self._errors = []
         self.parse_attrs(attrs)
 
     def __repr__(self):
@@ -129,23 +131,42 @@ class BaseTag(object):
     def parse_attrs(self, attrs):
         self.attrs = parsed_attrs = {}
 
-        for attr_def in self.attr_defs:
-            attr_name, parser = attr_def[:2]
-            default = attr_def[2] if len(attr_def) == 3 else REQUIRED
+        duplicate_keys = []
 
-            # TODO better messages on failures
-            val = given_attrs.pop(attr_name, default)
+        for attr_key, attr_val in attrs:
+            attr_def = self.attr_defs.get(attr_key)
 
-            if val is REQUIRED:
-                raise BBCondeParseError(
-                        '{} is is a required attribute for {}'.format(
-                        self.attr_name, self.tag_name))
+            if attr_def is None:
+                self._errors.append('got undefined attr {}'.format(attr_key))
+                continue
 
-            parsed_val = parser(val) if parser is not None else val
-            parsed_attrs[attr_name] = parsed_val
+            if attr_key in parsed_attrs:
+                duplicate_keys.append(attr_key)
 
-        #TODO finish this
-        return parsed_attrs
+            if 'parser' in attr_def:
+                try:
+                    attr_val = attr_def['parser'](attr_val)
+                except ValueError as e:
+                    self._errors.append(
+                        'failed to parse attr {} with value {}: {}'.format(
+                        attr_key, attr_val, e,
+                        )
+                    )
+                    continue
+
+            parsed_attrs[attr_key] = attr_val
+
+        for key in duplicate_keys:
+            self._errors.append('duplicate definition for key {}'.format(key))
+
+        for attr_key, attr_def in self.attr_defs.items():
+            if attr_key not in parsed_attrs:
+                try:
+                    parsed_attrs[attr_key] = attr_def['default']
+                except KeyError:
+                    self._errors.append(
+                        'missing required attr {}'.format(attr_key)
+                    )
 
     def render_children(self):
         return ''.join(child.render() for child in self.tree)
@@ -161,14 +182,14 @@ class BaseTag(object):
     def _render(self):
         raise NotImplementedError
 
-    def get_raw(self):
+    def render_raw(self):
         return self.start_text + self.get_children_raw()  + self.end_text
 
     def get_children_raw(self):
-        return ''.join(child.get_raw() for child in self.tree)
+        return ''.join(child.render_raw() for child in self.tree)
 
 
-class BaseSimpleTag(BaseTag):
+class SimpleTag(BaseTag):
     # use one '{{ body }}' to be replaced with the contents
     # of the items children
     # e.g. "<awesometext>{{ body }}</awesometext>"
@@ -176,8 +197,8 @@ class BaseSimpleTag(BaseTag):
     replace_text = '{{ body }}'
     def _render(self):
         if self.template is None:
-            raise RuntimeError(
-                    "{} class has no template defined".format(
-                    self.__class__.__name__))
+            return self.render_children()
 
-        return self.template.replace(self.replace_text, self.render_children())
+        return self.template.replace(
+            self.replace_text, self.render_children()
+        )

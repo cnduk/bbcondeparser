@@ -3,10 +3,41 @@ import re
 from bbcondeparser.utils import (
     to_unicode, normalize_newlines, remove_backslash_escapes
 )
-from bbcondeparser.tags import BaseTag, ErrorText, RawText
+from bbcondeparser.tags import ErrorText, RawText
 
 TAG_START = 'tag_start'
 TAG_END = 'tag_end'
+
+
+class BaseTreeParser(object):
+    tags = []
+    ignored_tags = []
+
+    raw_text_class = RawText
+    error_text_class = ErrorText
+
+    def __init__(self, text):
+        self.raw_text = text
+
+        ignored_tags = [tag.null_class for tag in self.ignored_tags]
+        tags = self.tags + ignored_tags
+
+        self.tree = parse_tree(
+            text, tags,
+            raw_text_class=self.raw_text_class,
+            error_text_class=self.error_text_class
+        )
+
+
+    def render(self):
+        return ''.join(tag.render() for tag in self.tree)
+
+    def pretty_print(self):
+        return '\n'.join(
+            getattr(child, 'pretty_print', child.__repr__)()
+            for child in self.tree
+        )
+
 
 def parse_tree(
     raw_text, tags, raw_text_class=RawText, error_text_class=ErrorText
@@ -33,11 +64,11 @@ def parse_tree(
 
         if curr_pos == -1:
             # No more open/close tags
-            tree.append(RawText(raw_text[last_pos:]))
+            tree.append(raw_text_class(raw_text[last_pos:]))
             break
 
         if curr_pos > last_pos: # We've scanned past some text
-            tree.append(RawText(raw_text[last_pos:curr_pos]))
+            tree.append(raw_text_class(raw_text[last_pos:curr_pos]))
 
         if stack and stack[-1][2].close_on_newline and raw_text[curr_pos] == '\n':
             tag_tree = tree
@@ -52,7 +83,7 @@ def parse_tree(
         #TODO disallow newlines in middle of tags?
         next_close = raw_text.find(']', curr_pos)
         if next_close == -1:
-            tree.append(ErrorText(
+            tree.append(error_text_class(
                 raw_text[curr_pos:], "Missing tag close ']'"
             ))
             break
@@ -60,7 +91,7 @@ def parse_tree(
         else:
             tag_info = parse_tag(raw_text[curr_pos+1:next_close])
             if tag_info is None:
-                tree.append(ErrorText(
+                tree.append(error_text_class(
                     raw_text[curr_pos:next_close+1], "Invalid tag syntax"
                 ))
                 curr_pos = next_close + 1
@@ -70,7 +101,7 @@ def parse_tree(
             tag_cls = tag_dict.get(tag_name, None)
 
             if tag_cls is None and (not stack or stack[-1][2].tag_name != tag_name):
-                tree.append(ErrorText(
+                tree.append(error_text_class(
                     raw_text[curr_pos:next_close+1], "unknown tag"
                 ))
                 curr_pos = next_close + 1
@@ -101,7 +132,7 @@ def parse_tree(
 
             # tag_open_close == TAG_END
             if not stack or tag_name != stack[-1][2].tag_name:
-                tree.append(ErrorText(
+                tree.append(error_text_class(
                     raw_text[curr_pos:next_close+1],
                     "Close tag does not match current open tag '{}'".format(
                         (stack[-1][2].tag_name if stack else '<None>'),
@@ -121,7 +152,7 @@ def parse_tree(
         curr_tree = tree
         tree, tag_dict, tag_cls, tag_attrs, tag_text = stack.pop()
 
-        tree = tree + [ErrorText(tag_text, "Missing close tag")] + curr_tree
+        tree = tree + [error_text_class(tag_text, "Missing close tag")] + curr_tree
 
     return tree
 
@@ -151,6 +182,9 @@ def parse_tag(text):
                 (on an open tag only, None on end tags)
         returns None on a failed parse
     """
+    if not text:
+        return None
+
     if text[0] == '/':
         if _end_tag_re.match(text):
             return (TAG_END, text[1:], None)
