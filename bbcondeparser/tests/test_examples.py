@@ -2,6 +2,9 @@ import unittest
 
 from bbcondeparser import BaseTag, SimpleTag, ErrorText, BaseTreeParser
 
+###############################################################################
+# Definition of tags and parsers up here
+###############################################################################
 
 class Bold(SimpleTag):
     tag_name = 'b'
@@ -130,14 +133,25 @@ class InfoBox(ChildSearcher):
         return '<table>{}{}</table>'.format(title, body)
 
 
+class CodeTag(BaseTag):
+    tag_name = 'code'
+    def _render(self):
+        return '<code><pre>' + self.get_children_raw() + '</code></pre>'
+
+
 class Parser(BaseTreeParser):
-    tags = [Bold, Italic, InfoBox]
+    tags = [Bold, Italic, InfoBox, CodeTag]
     ignored_tags = [Image]
 
 
-class TestInfobox(unittest.TestCase):
+###############################################################################
+# Unit test classes doon 'ere!
+###############################################################################
+class BaseTesty(unittest.TestCase):
+    parser = Parser
+
     def _testy(self, input_text, expected_output):
-        parser = Parser(input_text)
+        parser = self.parser(input_text)
         result_output = parser.render()
         self.assertEqual(
             expected_output,
@@ -147,34 +161,47 @@ class TestInfobox(unittest.TestCase):
             )
         )
 
+class TestBoldItalic(BaseTesty):
     def test_BI(self):
         self._testy(
-            """[b][i]Hello, world![/i][/b]""",
-            """<b><i>Hello, world!</i></b>""",
+            "[b][i]Hello, world![/i][/b]",
+            "<b><i>Hello, world!</i></b>",
         )
 
+
+class TestInfobox(BaseTesty):
     def test_infobox(self):
         self._testy(
-"""[infobox]
-    [title]a magical title[/title]
-    [item]
-        [key]bananas[/key]
-        [value]yellow[/value]
-    [/item]
-    [item]
-        [value]red/green[/value]
-        [key]apples[/key]
-    [/item]
-[/infobox]""",
-"""<table>"""
-    """<td colspan="2">a magical title</td>"""
-    """<td>bananas</td><td>yellow</td>"""
-    """<td>apples</td><td>red/green</td>"""
-"""</table>""",
+            """[infobox]
+                [title]a magical title[/title]
+                [item]
+                    [key]bananas[/key]
+                    [value]yellow[/value]
+                [/item]
+                [item]
+                    [value]red/green[/value]
+                    [key]apples[/key]
+                [/item]
+            [/infobox]""",
+            "<table>"
+                '<td colspan="2">a magical title</td>'
+                "<td>bananas</td><td>yellow</td>"
+                "<td>apples</td><td>red/green</td>"
+            "</table>",
         )
 
+
+class TestIgnored(BaseTesty):
     def test_ignored(self):
         self._testy(
-            """[img src="dontrenderme"]hello!""",
-            """hello!""",
+            '[img src="dontrenderme"]hello!',
+            "hello!",
+        )
+
+
+class TestCodeTag(BaseTesty):
+    def test_codetag(self):
+        self._testy(
+            "[code][b][i]Hello, world![/i][/b][/code]",
+            "<code><pre>[b][i]Hello, world![/i][/b]</code></pre>",
         )
