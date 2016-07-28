@@ -3,7 +3,7 @@ import re
 from bbcondeparser.utils import (
     to_unicode, normalize_newlines, remove_backslash_escapes
 )
-from bbcondeparser.tags import ErrorText, RawText
+from bbcondeparser.tags import ErrorText, RawText, parse_tag_set
 
 TAG_START = 'tag_start'
 TAG_END = 'tag_end'
@@ -32,15 +32,15 @@ class BaseTreeParser(object):
     def render(self):
         return ''.join(tag.render() for tag in self.tree)
 
-    def pretty_print(self):
+    def pretty_format(self):
         return '\n'.join(
-            getattr(child, 'pretty_print', child.__repr__)()
+            getattr(child, 'pretty_format', child.__repr__)()
             for child in self.tree
         )
 
 
 def parse_tree(
-    raw_text, tags, raw_text_class=RawText, error_text_class=ErrorText
+    raw_text, tags, raw_text_class=RawText, error_text_class=ErrorText,
 ):
     """`raw_text` is the raw bb code (conde format) to be parsed
         `tags` should be an iterable of tag classes allowed in the text
@@ -119,12 +119,7 @@ def parse_tree(
                 ))
                 tree = []
 
-                if tag_cls.tag_set:
-                    tag_dict = {
-                        tag_name: tag_cls.null_class
-                        for tag_name, tag_cls in tag_dict.items()
-                    }
-                    tag_dict.update(create_tag_dict(tag_cls.tag_set))
+                tag_dict = get_new_tag_dict(tag_cls, tag_dict)
 
                 curr_pos = next_close + 1
                 continue
@@ -157,7 +152,7 @@ def parse_tree(
     return tree
 
 
-_whitespace_re = re.compile('\s*')
+_whitespace_re = re.compile('\s+')
 
 _tag_name_re_str = '[a-zA-Z-]+'
 _end_tag_re = re.compile('^/{_tag_name_re_str}$'.format(**locals()))
@@ -210,21 +205,30 @@ def parse_tag(text):
 
 
 def create_tag_dict(tags):
-    tag_dict = {}
+    # parse_tag_set will raise a RuntimeError
+    # if duplicate tag_names are detected.
+    tags = parse_tag_set(tags)
+    return {tag.tag_name: tag for tag in tags}
 
-    for tag in tags:
-        if tag.tag_name in tag_dict:
-            # Be nice, if the same tag has been passed more than once
-            # then just accept it - the behaviour is all the same.
-            if tag_dict[tag.tag_name] is not tag:
-                raise RuntimeError("Duplicate tag names detected")
 
-        tag_dict[tag.tag_name] = tag
+def get_new_tag_dict(tag_cls, tag_dict):
+    allowed_tags = tag_cls.get_allowed_tags()
+    if allowed_tags is not None:
+        tag_dict = {
+            tag_name: tag_cls.null_class
+            for tag_name, tag_cls in tag_dict.items()
+        }
+        tag_dict.update(create_tag_dict(tag_cls.allowed_tags))
 
     return tag_dict
 
 
 def find_next_multi_char(search_string, chars, start=0):
+    # So I thought this would be inefficient, and tried to improve it.
+    # I did some benchmarking and for small numbers of `chars` (which we'll
+    # be using in this module) it makes little difference whether we
+    # try and combine multiple str.find()s, or loop through the string
+    # ourselves to try and locate the next character.
     matches = list(
         match
         for match in (

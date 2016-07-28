@@ -16,7 +16,7 @@ class MockBaseTag(BaseTag):
         return self.__init_with == other.__init_with
 
     def __repr__(self):
-        return self.pretty_print()
+        return self.pretty_format()
 
 
 class TestFindNextMultiChar(unittest.TestCase):
@@ -111,13 +111,13 @@ class TestParseTag(unittest.TestCase):
 
 class TestCreateTagDict(unittest.TestCase):
     def test_ok(self):
-        class Tag1(object):
+        class Tag1(MockBaseTag):
             tag_name = 'apples'
 
-        class Tag2(object):
+        class Tag2(MockBaseTag):
             tag_name = 'bananas'
 
-        class Tag3(object):
+        class Tag3(MockBaseTag):
             tag_name = 'oranges'
 
         input = [Tag1, Tag2, Tag3, Tag2] # Duplicates are accepted
@@ -128,13 +128,13 @@ class TestCreateTagDict(unittest.TestCase):
         self.assertEqual(expected, result)
 
     def test_duplicate_name(self):
-        class Tag1(object):
+        class Tag1(MockBaseTag):
             tag_name = 'apples'
 
-        class Tag2(object):
+        class Tag2(MockBaseTag):
             tag_name = 'bananas'
 
-        class Tag3(object):
+        class Tag3(MockBaseTag):
             tag_name = 'apples'
 
         input = [Tag1, Tag2, Tag3]
@@ -247,7 +247,7 @@ class TestParseTree(unittest.TestCase):
 
         class OuterTag(MockBaseTag):
             tag_name = 'banana'
-            tag_set = [InnerTag]
+            allowed_tags = [InnerTag]
 
         tags = [OuterTag]
         input_text = '[banana][inner]Hello![/inner][/banana]'
@@ -325,11 +325,11 @@ class TestParseTree(unittest.TestCase):
 
         class OuterTag1(MockBaseTag):
             tag_name = 'outer-banana'
-            tag_set = [InnerTag1, InnerTag2]
+            allowed_tags = [InnerTag1, InnerTag2]
 
         class OuterTag2(MockBaseTag):
             tag_name = 'outer-apple'
-            tag_set = [InnerTag1]
+            allowed_tags = [InnerTag1]
 
         tags = [OuterTag1, OuterTag2]
         # Text written like this so that don't have to deal with loads of newlines

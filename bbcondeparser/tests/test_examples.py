@@ -1,20 +1,24 @@
 import unittest
 
-from bbcondeparser import BaseTag, SimpleTag, ErrorText, BaseTreeParser
+from bbcondeparser import (
+    BaseTag, SimpleTag, ErrorText, BaseTreeParser, TagCategory
+)
 
 ###############################################################################
 # Definition of tags and parsers up here
 ###############################################################################
 
+SIMPLE_TAGS = TagCategory("simple tags")
+
 class Bold(SimpleTag):
     tag_name = 'b'
     template = '<b>{}</b>'.format(SimpleTag.replace_text)
-
+    tag_categories = [SIMPLE_TAGS]
 
 class Italic(SimpleTag):
     tag_name = 'i'
     template = '<i>{}</i>'.format(SimpleTag.replace_text)
-
+    tag_categories = [SIMPLE_TAGS]
 
 class Image(BaseTag):
     tag_name = 'img'
@@ -65,18 +69,18 @@ class ChildSearcher(BaseTag):
 class InfoBoxItemKey(SimpleTag):
     template = None
     tag_name = 'key'
-    tag_set = [Bold, Italic]
+    allowed_tags = [SIMPLE_TAGS]
 
 
 class InfoBoxItemValue(SimpleTag):
     template = None
     tag_name = 'value'
-    tag_set = [Bold, Italic]
+    allowed_tags = [SIMPLE_TAGS]
 
 
 class InfoBoxItem(ChildSearcher):
     tag_name = 'item'
-    tag_set = [InfoBoxItemKey, InfoBoxItemValue]
+    allowed_tags = [InfoBoxItemKey, InfoBoxItemValue]
 
     def __init__(self, *args, **kwargs):
         super(InfoBoxItem, self).__init__(*args, **kwargs)
@@ -99,7 +103,7 @@ class InfoBoxItem(ChildSearcher):
 
 class InfoBoxTitle(BaseTag):
     tag_name = 'title'
-    tag_set = [Bold, Italic]
+    allowed_tags = [SIMPLE_TAGS]
 
     def _render(self):
         return self.render_title(self.render_children())
@@ -111,7 +115,7 @@ class InfoBoxTitle(BaseTag):
 
 class InfoBox(ChildSearcher):
     tag_name = 'infobox'
-    tag_set = [InfoBoxItem, InfoBoxTitle]
+    allowed_tags = [InfoBoxItem, InfoBoxTitle]
 
     def __init__(self, *args, **kwargs):
         super(InfoBox, self).__init__(*args, **kwargs)
@@ -140,7 +144,7 @@ class CodeTag(BaseTag):
 
 
 class Parser(BaseTreeParser):
-    tags = [Bold, Italic, InfoBox, CodeTag]
+    tags = [SIMPLE_TAGS, InfoBox, CodeTag]
     ignored_tags = [Image]
 
 
@@ -157,7 +161,7 @@ class BaseTesty(unittest.TestCase):
             expected_output,
             result_output,
             "not equal:\n{}\n{}\ntree:\n{}".format(
-                expected_output, result_output, parser.pretty_print()
+                expected_output, result_output, parser.pretty_format()
             )
         )
 
