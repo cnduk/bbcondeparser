@@ -56,7 +56,7 @@ def parse_tree(
     while curr_pos < len(raw_text):
         last_pos = curr_pos
 
-        if stack and stack[-1][2].close_on_newline:
+        if _want_close_on_newline(stack):
             curr_pos = find_next_multi_char(raw_text, '[\n', curr_pos)
 
         else:
@@ -70,12 +70,32 @@ def parse_tree(
         if curr_pos > last_pos: # We've scanned past some text
             tree.append(raw_text_class(raw_text[last_pos:curr_pos]))
 
-        if stack and stack[-1][2].close_on_newline and raw_text[curr_pos] == '\n':
-            tag_tree = tree
+        if _want_close_on_newline(stack) and raw_text[curr_pos] == '\n':
+            while stack:
+                tag_tree = tree
 
-            tree, tag_dict, tag_cls, tag_attrs, tag_text = stack.pop()
-            tree.append(tag_cls(tag_attrs, tag_tree, tag_text, '\n'))
-            curr_pos += 1
+                tree, tag_dict, tag_cls, tag_attrs, tag_text = stack.pop()
+
+
+                if not tag_cls.close_on_newline:
+                    tree.append(error_text_class(
+                        tag_text, "ancestor tag closed by newline"
+                    ))
+                    tree.extend(tag_tree)
+
+                    continue
+
+                if _want_close_on_newline(stack):
+                    # A parent still wants to be closed by the newline, so
+                    # close the current tag, and don't give it the newline
+                    # for its raw, save it for the parent.
+                    tree.append(tag_cls(tag_attrs, tag_tree, tag_text, ''))
+                    continue
+
+                tree.append(tag_cls(tag_attrs, tag_tree, tag_text, '\n'))
+
+                curr_pos += 1
+                break
 
             continue
 
@@ -124,22 +144,51 @@ def parse_tree(
                 curr_pos = next_close + 1
                 continue
 
-
             # tag_open_close == TAG_END
-            if not stack or tag_name != stack[-1][2].tag_name:
-                tree.append(error_text_class(
-                    raw_text[curr_pos:next_close+1],
-                    "Close tag does not match current open tag '{}'".format(
-                        (stack[-1][2].tag_name if stack else '<None>'),
-                    )
-                ))
+            # tag name matches?, so all is ok!
+            if stack and stack[-1][2].tag_name == tag_name:
+                tag_tree = tree
+                tree, tag_dict, tag_cls, tag_attrs, tag_text = stack.pop()
+
+                tree.append(tag_cls(tag_attrs, tag_tree, tag_text, raw_text[curr_pos:next_close+1]))
+
                 curr_pos = next_close + 1
                 continue
 
-            tag_tree = tree
-            tree, tag_dict, tag_cls, tag_attrs, tag_text = stack.pop()
+            # tag name doesn't match. First check to see if this tag has ever
+            # been opened. If not, then this close in in error and just
+            # make that wrong.
+            if not any(s[2].tag_name == tag_name for s in stack):
+                tree.append(error_text_class(
+                        raw_text[curr_pos:next_close+1],
+                        "Close tag does not match any open tag",
+                    )
+                )
+                curr_pos = next_close + 1
+                continue
 
-            tree.append(tag_cls(tag_attrs, tag_tree, tag_text, raw_text[curr_pos:next_close+1]))
+            # otherwise it's short circuting, e.g.
+            # "[a][b][/a]", the "[/a]" is short circuting the "[b]"
+            # so need to search back the stack for a matching tag.
+            while stack:
+                tag_tree = tree
+                tree, tag_dict, other_tag_cls, tag_attrs, tag_text = stack.pop()
+
+                if tag_cls.tag_name != other_tag_cls.tag_name:
+                    tree.append(error_text_class(
+                        tag_text,
+                        "Open tag short-circuited by close tag {}".format(
+                            raw_text[curr_pos:next_close+1],
+                        ),
+                    ))
+                    tree.extend(tag_tree)
+
+                    continue
+
+                tree.append(
+                    other_tag_cls(tag_attrs, tag_tree, tag_text, raw_text[curr_pos:next_close+1])
+                )
+
             curr_pos = next_close + 1
 
     while stack:
@@ -239,3 +288,8 @@ def find_next_multi_char(search_string, chars, start=0):
     )
 
     return min(matches) if matches else -1
+
+
+def _want_close_on_newline(stack):
+    #any([]) returns False
+    return any(s[2].close_on_newline for s in stack)

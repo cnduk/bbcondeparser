@@ -293,7 +293,7 @@ class TestParseTree(unittest.TestCase):
         self.assertEqual(expected_tree, result)
 
     def test_close_not_opened_tag(self):
-        class Tag1(BaseTag):
+        class Tag1(MockBaseTag):
             tag_name = 'apple'
 
         input_text = '[/apple]'
@@ -310,6 +310,67 @@ class TestParseTree(unittest.TestCase):
         tags = []
 
         expected_tree = [ErrorText('[]')]
+
+        result = tree_parser.parse_tree(input_text, tags)
+
+        self.assertEqual(expected_tree, result)
+
+    def test_close_outer_tag(self):
+        class Tag1(MockBaseTag):
+            tag_name = 'a'
+
+        class Tag2(MockBaseTag):
+            tag_name = 'b'
+
+        input_text = '[a][b][/a][/b]'
+        tags = [Tag1, Tag2]
+
+        expected_tree = [
+            Tag1((), [ErrorText('[b]')], '[a]', '[/a]'),
+            ErrorText('[/b]'),
+        ]
+
+        result = tree_parser.parse_tree(input_text, tags)
+
+        self.assertEqual(expected_tree, result)
+
+    def test_close_outer_tag_newline(self):
+        class Tag1(MockBaseTag):
+            tag_name = 'a'
+            close_on_newline = True
+
+        class Tag2(MockBaseTag):
+            tag_name = 'b'
+
+        input_text = '[a][b]\n[/b]'
+        tags = [Tag1, Tag2]
+
+        expected_tree = [
+            Tag1((), [ErrorText('[b]')], '[a]', '\n'),
+            ErrorText('[/b]'),
+        ]
+
+        result = tree_parser.parse_tree(input_text, tags)
+
+        self.assertEqual(expected_tree, result)
+
+    def test_close_out_tag_newline_multi(self):
+        class Tag1(MockBaseTag):
+            tag_name = 'a'
+            close_on_newline = True
+
+        input_text = '[a][a][a]text\n[/a][/a]'
+        tags = [Tag1]
+
+        expected_tree = [
+            Tag1((), [
+                Tag1((), [
+                    Tag1((), [RawText("text")], '[a]', ''),
+                ], '[a]', ''),
+            ], '[a]', '\n'),
+            ErrorText("[/a]"),
+            ErrorText("[/a]"),
+        ]
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -406,17 +467,17 @@ class TestParseTree(unittest.TestCase):
 
 class TestTreeParser(unittest.TestCase):
     def test_parser(self):
-        class Bold(BaseTag):
+        class Bold(MockBaseTag):
             tag_name = 'b'
             def _render(self):
                 return '<b>{}</b>'.format(self.render_children())
 
-        class Italic(BaseTag):
+        class Italic(MockBaseTag):
             tag_name = 'i'
             def _render(self):
                 return '<i>{}</i>'.format(self.render_children())
 
-        class ToBeIgnored(BaseTag):
+        class ToBeIgnored(MockBaseTag):
             tag_name = 'ignored'
             def _render(self):
                 return "I SHOULD HAVE BEEN IGNORED"
