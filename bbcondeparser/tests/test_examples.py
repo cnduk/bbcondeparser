@@ -21,7 +21,7 @@ class Image(BaseTag):
     self_closing = True
 
     attr_defs = {
-        'src': (None,), # tuple length 1 = required, None - no parser.
+        'src': {} # required, no parser.
     }
 
     def _render(self):
@@ -136,7 +136,7 @@ class InfoBox(ChildSearcher):
 class CodeTag(BaseTag):
     tag_name = 'code'
     def _render(self):
-        return '<code><pre>' + self.get_children_raw() + '</code></pre>'
+        return '<code><pre>' + self.render_children_raw() + '</code></pre>'
 
 
 class Parser(BaseTreeParser):

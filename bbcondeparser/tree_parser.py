@@ -175,22 +175,25 @@ def parse_tag(text):
         [/b] = /b
 
         returns a tuple (start/end, name, attrs)
-            start/end is either parser.TAG_START or parser.TAG_END,
+            `start/end` is either tree_parser.TAG_START or tree_parser.TAG_END,
                 indicating if it's a starting tag or end tag.
-            name is the name of the tag
-            attrs is any attributes defined as a tuple of two-tuples
+            `name` is the name of the tag
+            `attrs` is any attributes defined as a tuple of two-tuples
                 (on an open tag only, None on end tags)
         returns None on a failed parse
     """
-    if not text:
+    if not text: # tag was empty (e.g. [])
         return None
 
-    if text[0] == '/':
+    if text[0] == '/': # It's a close tag e.g. [/foo]
         if _end_tag_re.match(text):
             return (TAG_END, text[1:], None)
         else:
             return None
 
+    # [tagname<whitespace><attrs...>] -> (<tagname>, <attrs...>)
+    # or [tagname] -> (<tagname>,)
+    # or [tagname<whitespace>] -> (tagname, '')
     parts = _whitespace_re.split(text, maxsplit=1)
     tag_name = parts[0]
     attrs_str = parts[1] if len(parts) == 2 else ''
@@ -198,17 +201,10 @@ def parse_tag(text):
     if not (_start_tag_name_re.match(tag_name) and _attrs_re.match(attrs_str)):
         return None
 
-    attr_vals = []
-    # Python's re module doesn't have a way to say "return multiple items if
-    # a group matches more than once". So pass a closure into re.sub() for the
-    # repl argument, to populate attrs_dict as it discovers matches to sub.
-    def catch_attrs(match):
-        attr_name, attr_val = match.groups()
-        attr_val = remove_backslash_escapes(attr_val)
-        attr_vals.append((attr_name, attr_val))
-        return '' # re.sub() expects a replacement string
-
-    _attr_re.sub(catch_attrs, attrs_str)
+    attr_vals = list(
+        (attr_name, remove_backslash_escapes(attr_val))
+        for attr_name, attr_val in _attr_re.findall(attrs_str)
+    )
 
     return (TAG_START, tag_name, tuple(attr_vals))
 

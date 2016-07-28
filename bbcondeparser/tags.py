@@ -183,9 +183,9 @@ class BaseTag(object):
         raise NotImplementedError
 
     def render_raw(self):
-        return self.start_text + self.get_children_raw()  + self.end_text
+        return self.start_text + self.render_children_raw()  + self.end_text
 
-    def get_children_raw(self):
+    def render_children_raw(self):
         return ''.join(child.render_raw() for child in self.tree)
 
 
