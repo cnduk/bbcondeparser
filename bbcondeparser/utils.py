@@ -46,5 +46,24 @@ def _replace_backslash_sub(match):
     # we just want to replace the two characters with whatever the second character is.
     return match.groups()[0][1]
 
+
 def remove_backslash_escapes(text):
     return _backslash_sub_re.sub(_replace_backslash_sub, text)
+
+
+def find_next_multi_char(search_string, chars, start=0):
+    # So I thought this would be inefficient, and tried to improve it.
+    # I did some benchmarking and for small numbers of `chars` (which we'll
+    # be using in this module) it makes little difference whether we
+    # try and combine multiple str.find()s, or loop through the string
+    # ourselves to try and locate the next character.
+    matches = list(
+        match
+        for match in (
+            search_string.find(char, start)
+            for char in chars
+        )
+        if match >= 0
+    )
+
+    return min(matches) if matches else -1
