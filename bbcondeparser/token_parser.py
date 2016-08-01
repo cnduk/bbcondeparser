@@ -155,7 +155,7 @@ class TokenParser(object):
             else:
                 tag_type, tag_name, tag_attrs = tag_info
 
-                if tag_type == 'start_tag':
+                if tag_type == 'open_tag':
                     self.tokens.append(OpenTagToken(
                         tag_text, tag_location, tag_name, tag_attrs
                     ))
@@ -215,7 +215,7 @@ def parse_tag(text):
         [/b]
 
         returns a tuple (start/end, name, attrs)
-            `start/end` is either tree_parser.TAG_START or tree_parser.TAG_END,
+            `start/end` is either open_tag or close_tag
                 indicating if it's a starting tag or end tag.
             `name` is the name of the tag
             `attrs` is any attributes defined as a tuple of two-tuples
@@ -249,4 +249,4 @@ def parse_tag(text):
         for attr_name, attr_val in _attr_re.findall(attrs_str)
     )
 
-    return ('start_tag', tag_name, tuple(attr_vals))
+    return ('open_tag', tag_name, tuple(attr_vals))

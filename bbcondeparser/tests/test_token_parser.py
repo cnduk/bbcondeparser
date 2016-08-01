@@ -83,7 +83,7 @@ class TestFindNextMultiChar(unittest.TestCase):
 class TestParseTag(unittest.TestCase):
     def test_alphanumeric_tag(self):
         input = '[h1]'
-        expected = 'start_tag', 'h1', ()
+        expected = 'open_tag', 'h1', ()
 
         result = token_parser.parse_tag(input)
 
@@ -108,7 +108,7 @@ class TestParseTag(unittest.TestCase):
 
     def test_open_no_attrs(self):
         input = '[an-open-tag]'
-        expected = 'start_tag', 'an-open-tag', ()
+        expected = 'open_tag', 'an-open-tag', ()
 
         result = token_parser.parse_tag(input)
 
@@ -121,7 +121,7 @@ class TestParseTag(unittest.TestCase):
             ('attr-b', 'apple'),
             ('attr-b', r'this is a " double quote'),
         )
-        expected = 'start_tag', 'an-open-tag', expected_attrs
+        expected = 'open_tag', 'an-open-tag', expected_attrs
 
         result = token_parser.parse_tag(input)
 
