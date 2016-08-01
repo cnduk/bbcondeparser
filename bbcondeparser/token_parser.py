@@ -169,7 +169,8 @@ class TokenParser(object):
 
 _whitespace_re = re.compile('\s+')
 
-_tag_name_re_str = '[a-zA-Z-]+'
+# Tag names can be all letters or a mixture of numbers and letters
+_tag_name_re_str = '[\w-]+'
 _attr_re_str = r'([a-zA-Z-]+)="((?:[^\\"]|\\.)*)"'
 _attrs_re_str = r'^(?:\s*{_attr_re_str}\s*)*$'.format(**locals())
 
