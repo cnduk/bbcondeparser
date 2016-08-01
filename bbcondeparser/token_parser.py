@@ -99,7 +99,7 @@ class TokenParser(object):
             elif self.text[self.curr_pos] == '\n':
                 self.process_newline()
 
-            elif self.text[self.curr_pos] == '[':
+            else: # self.text[self.curr_pos] == '[':
                 self.parse_tag_token()
 
             # Move onto next character to start processing from

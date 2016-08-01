@@ -1,8 +1,14 @@
-import re
+from collections import namedtuple
 
-from bbcondeparser.utils import (
-    to_unicode, normalize_newlines, remove_backslash_escapes
+from bbcondeparser.token_parser import (
+    get_tokens,
+    TextToken,
+    BadSyntaxToken,
+    NewlineToken,
+    OpenTagToken,
+    CloseTagToken,
 )
+
 from bbcondeparser.tags import ErrorText, RawText, parse_tag_set
 
 TAG_START = 'tag_start'
@@ -28,7 +34,6 @@ class BaseTreeParser(object):
             error_text_class=self.error_text_class
         )
 
-
     def render(self):
         return ''.join(tag.render() for tag in self.tree)
 
@@ -39,219 +44,134 @@ class BaseTreeParser(object):
         )
 
 
+StackLevel = namedtuple(
+    'TreeParserStackLevel',
+    ['tree', 'tag_dict', 'tag_cls', 'tag_open_token']
+)
+class TreeStack(object):
+    def __init__(self):
+        self.stack = []
+
+    def __bool__(self):
+        return len(self.stack) > 0
+
+    __nonzero__ = __bool__ # python 2.x portability
+
+    def pop(self):
+        return self.stack.pop()
+
+    def push(self, tree, tag_dict, tag_cls, tag_open_token):
+        item = StackLevel(tree, tag_dict, tag_cls, tag_open_token)
+        self.stack.append(item)
+
+    def contains_open_for(self, token):
+        assert isinstance(token, CloseTagToken)
+        return any(
+            stack_level.tag_cls.tag_name == token.tag_name
+            for stack_level in self.stack
+        )
+
+    def want_close_on_newline(self):
+        return any(
+            stack_level.tag_cls.close_on_newline
+            for stack_level in self.stack
+        )
+
+
 def parse_tree(
     raw_text, tags, raw_text_class=RawText, error_text_class=ErrorText,
 ):
     """`raw_text` is the raw bb code (conde format) to be parsed
         `tags` should be an iterable of tag classes allowed in the text
     """
-    raw_text = to_unicode(raw_text)
-    raw_text = normalize_newlines(raw_text)
+    tokens = get_tokens(raw_text)
     tag_dict = create_tag_dict(tags)
 
-    stack = [] # stack of (tree, tag_dict, tag_cls, tag_attrs, tag_open_text)
+    stack = TreeStack()
     tree = []
 
-    curr_pos = 0
-    while curr_pos < len(raw_text):
-        last_pos = curr_pos
+    for token in tokens:
+        if isinstance(token, TextToken):
+            tree.append(raw_text_class(token.text))
 
-        if _want_close_on_newline(stack):
-            curr_pos = find_next_multi_char(raw_text, '[\n', curr_pos)
+        elif isinstance(token, BadSyntaxToken):
+            tree.append(error_text_class(token.text, token.reason))
 
-        else:
-            curr_pos = raw_text.find('[', curr_pos)
+        elif isinstance(token, OpenTagToken):
+            tag_cls = tag_dict.get(token.tag_name)
 
-        if curr_pos == -1:
-            # No more open/close tags
-            tree.append(raw_text_class(raw_text[last_pos:]))
-            break
+            if tag_cls is None:
+                tree.append(error_text_class(token.text, "unknown tag"))
 
-        if curr_pos > last_pos: # We've scanned past some text
-            tree.append(raw_text_class(raw_text[last_pos:curr_pos]))
+            elif tag_cls.self_closing:
+                # "[]" because self-closing tags contain no tree.
+                tree.append(tag_cls(token.attrs, [], token.text, ""))
 
-        if _want_close_on_newline(stack) and raw_text[curr_pos] == '\n':
-            while stack:
-                tag_tree = tree
-
-                tree, tag_dict, tag_cls, tag_attrs, tag_text = stack.pop()
-
-
-                if not tag_cls.close_on_newline:
-                    tree.append(error_text_class(
-                        tag_text, "ancestor tag closed by newline"
-                    ))
-                    tree.extend(tag_tree)
-
-                    continue
-
-                if _want_close_on_newline(stack):
-                    # A parent still wants to be closed by the newline, so
-                    # close the current tag, and don't give it the newline
-                    # for its raw, save it for the parent.
-                    tree.append(tag_cls(tag_attrs, tag_tree, tag_text, ''))
-                    continue
-
-                tree.append(tag_cls(tag_attrs, tag_tree, tag_text, '\n'))
-
-                curr_pos += 1
-                break
-
-            continue
-
-
-        #TODO disallow newlines in middle of tags?
-        next_close = raw_text.find(']', curr_pos)
-        if next_close == -1:
-            tree.append(error_text_class(
-                raw_text[curr_pos:], "Missing tag close ']'"
-            ))
-            break
-
-        else:
-            tag_info = parse_tag(raw_text[curr_pos+1:next_close])
-            if tag_info is None:
-                tree.append(error_text_class(
-                    raw_text[curr_pos:next_close+1], "Invalid tag syntax"
-                ))
-                curr_pos = next_close + 1
-                continue
-
-            tag_open_close, tag_name, tag_attrs = tag_info
-            tag_cls = tag_dict.get(tag_name, None)
-
-            if tag_cls is None and (not stack or stack[-1][2].tag_name != tag_name):
-                tree.append(error_text_class(
-                    raw_text[curr_pos:next_close+1], "unknown tag"
-                ))
-                curr_pos = next_close + 1
-                continue
-
-            if tag_cls is not None and tag_open_close == TAG_START:
-                if tag_cls.self_closing:
-                    tree.append(tag_cls(tag_attrs, [], raw_text[curr_pos:next_close+1], ''))
-                    curr_pos = next_close + 1
-                    continue
-
-                stack.append((
-                    tree, tag_dict, tag_cls, tag_attrs,
-                    raw_text[curr_pos: next_close+1]
-                ))
+            else:
+                # It's an open tag, so push onto the stack
+                stack.push(tree, tag_dict, tag_cls, token)
                 tree = []
-
                 tag_dict = get_new_tag_dict(tag_cls, tag_dict)
 
-                curr_pos = next_close + 1
-                continue
-
-            # tag_open_close == TAG_END
-            # tag name matches?, so all is ok!
-            if stack and stack[-1][2].tag_name == tag_name:
-                tag_tree = tree
-                tree, tag_dict, tag_cls, tag_attrs, tag_text = stack.pop()
-
-                tree.append(tag_cls(tag_attrs, tag_tree, tag_text, raw_text[curr_pos:next_close+1]))
-
-                curr_pos = next_close + 1
-                continue
-
-            # tag name doesn't match. First check to see if this tag has ever
-            # been opened. If not, then this close in in error and just
-            # make that wrong.
-            if not any(s[2].tag_name == tag_name for s in stack):
+        # It's a close. First let's find if it's actually closing anything.
+        elif isinstance(token, CloseTagToken):
+            if not stack.contains_open_for(token):
                 tree.append(error_text_class(
-                        raw_text[curr_pos:next_close+1],
-                        "Close tag does not match any open tag",
-                    )
-                )
-                curr_pos = next_close + 1
-                continue
+                    token.text, "Close tag does not match any open tag"
+                ))
 
-            # otherwise it's short circuting, e.g.
-            # "[a][b][/a]", the "[/a]" is short circuting the "[b]"
-            # so need to search back the stack for a matching tag.
-            while stack:
-                tag_tree = tree
-                tree, tag_dict, other_tag_cls, tag_attrs, tag_text = stack.pop()
+            else:
+                while stack:
+                    tag_tree = tree
+                    tree, tag_dict, tag_cls, open_token = stack.pop()
 
-                if tag_cls.tag_name != other_tag_cls.tag_name:
-                    tree.append(error_text_class(
-                        tag_text,
-                        "Open tag short-circuited by close tag {}".format(
-                            raw_text[curr_pos:next_close+1],
-                        ),
-                    ))
-                    tree.extend(tag_tree)
+                    if not tag_cls.tag_name == token.tag_name:
+                        tree.append(error_text_class(
+                            open_token.text,
+                            "Open tag short-circuited by close tag"
+                        ))
+                        tree.extend(tag_tree)
 
-                    continue
+                    else:
+                        tree.append(tag_cls(open_token.attrs, tag_tree,
+                                open_token.text, token.text))
 
-                tree.append(
-                    other_tag_cls(tag_attrs, tag_tree, tag_text, raw_text[curr_pos:next_close+1])
-                )
+                        break
 
-            curr_pos = next_close + 1
+
+        elif isinstance(token, NewlineToken):
+            if not stack.want_close_on_newline():
+                tree.append(raw_text_class(token.text))
+
+            else:
+                while stack:
+                    tag_tree = tree
+                    tree, tag_dict, tag_cls, open_token = stack.pop()
+
+                    if not tag_cls.close_on_newline:
+                        tree.append(error_text_class(
+                            open_token.text,
+                            "Open tag short-circuited by newline closed outer tag"
+                        ))
+                        tree.extend(tag_tree)
+
+                    elif stack.want_close_on_newline():
+                        tree.append(tag_cls(open_token.attrs, tag_tree,
+                                open_token.text, ''))
+
+                    else:
+                        tree.append(tag_cls(open_token.attrs, tag_tree,
+                                open_token.text, token.text))
+                        break
 
     while stack:
-        # Things have gone wrong here, there are un-closed tags.
-        curr_tree = tree
-        tree, tag_dict, tag_cls, tag_attrs, tag_text = stack.pop()
+        tag_tree = tree
+        tree, tag_dict, tag_cls, open_token = stack.pop()
 
-        tree = tree + [error_text_class(tag_text, "Missing close tag")] + curr_tree
+        tree.append(error_text_class(open_token.text, "Missing close tag"))
+        tree.extend(tag_tree)
 
     return tree
-
-
-_whitespace_re = re.compile('\s+')
-
-_tag_name_re_str = '[a-zA-Z-]+'
-_end_tag_re = re.compile('^/{_tag_name_re_str}$'.format(**locals()))
-_start_tag_name_re = re.compile('^{_tag_name_re_str}$'.format(**locals()))
-
-_attr_re_str = r'([a-zA-Z-]+)="((?:[^\\"]|\\.)*)"'
-_attr_re = re.compile(_attr_re_str)
-_attrs_re = re.compile(r'^(?:\s*{_attr_re_str}\s*)*$'.format(**locals()))
-
-def parse_tag(text):
-    """`text` should be the text from within the tag
-        e.g:
-        [img src="banana.com/pic"] = img src="banana.com/pic"
-        [b] = b
-        [/b] = /b
-
-        returns a tuple (start/end, name, attrs)
-            `start/end` is either tree_parser.TAG_START or tree_parser.TAG_END,
-                indicating if it's a starting tag or end tag.
-            `name` is the name of the tag
-            `attrs` is any attributes defined as a tuple of two-tuples
-                (on an open tag only, None on end tags)
-        returns None on a failed parse
-    """
-    if not text: # tag was empty (e.g. [])
-        return None
-
-    if text[0] == '/': # It's a close tag e.g. [/foo]
-        if _end_tag_re.match(text):
-            return (TAG_END, text[1:], None)
-        else:
-            return None
-
-    # [tagname<whitespace><attrs...>] -> (<tagname>, <attrs...>)
-    # or [tagname] -> (<tagname>,)
-    # or [tagname<whitespace>] -> (tagname, '')
-    parts = _whitespace_re.split(text, maxsplit=1)
-    tag_name = parts[0]
-    attrs_str = parts[1] if len(parts) == 2 else ''
-
-    if not (_start_tag_name_re.match(tag_name) and _attrs_re.match(attrs_str)):
-        return None
-
-    attr_vals = list(
-        (attr_name, remove_backslash_escapes(attr_val))
-        for attr_name, attr_val in _attr_re.findall(attrs_str)
-    )
-
-    return (TAG_START, tag_name, tuple(attr_vals))
-
 
 def create_tag_dict(tags):
     # parse_tag_set will raise a RuntimeError
@@ -270,26 +190,3 @@ def get_new_tag_dict(tag_cls, tag_dict):
         tag_dict.update(create_tag_dict(tag_cls.allowed_tags))
 
     return tag_dict
-
-
-def find_next_multi_char(search_string, chars, start=0):
-    # So I thought this would be inefficient, and tried to improve it.
-    # I did some benchmarking and for small numbers of `chars` (which we'll
-    # be using in this module) it makes little difference whether we
-    # try and combine multiple str.find()s, or loop through the string
-    # ourselves to try and locate the next character.
-    matches = list(
-        match
-        for match in (
-            search_string.find(char, start)
-            for char in chars
-        )
-        if match >= 0
-    )
-
-    return min(matches) if matches else -1
-
-
-def _want_close_on_newline(stack):
-    #any([]) returns False
-    return any(s[2].close_on_newline for s in stack)

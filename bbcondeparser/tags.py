@@ -41,7 +41,7 @@ class ErrorText(BaseText):
     """
     def __init__(self, text, reason=None):
         """`text` - the invalid text from the markup source
-            `reason` - why the source text was considered invalid   
+            `reason` - why the source text was considered invalid
         """
         super(ErrorText, self).__init__(text)
         self.reason = reason

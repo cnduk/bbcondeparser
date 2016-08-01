@@ -47,6 +47,102 @@ class TestSalvageTagOffset(unittest.TestCase):
         self.assertEqual(expected_offset, actual_offset)
 
 
+class TestFindNextMultiChar(unittest.TestCase):
+    def test_case_1(self):
+        input = '01234567'
+        chars = '56z'
+
+        expected = 5
+
+        result = token_parser.find_next_multi_char(input, chars)
+
+        self.assertEqual(expected, result)
+
+    def test_case_2(self):
+        input = '0123a5a7b9'
+        chars = 'ba'
+        start = 7
+
+        expected = 8
+
+        result = token_parser.find_next_multi_char(input, chars, start)
+
+        self.assertEqual(expected, result)
+
+    def test_not_found(self):
+        input = '0000000000'
+        chars = 'pvfjaegsegr'
+
+        expected = -1
+
+        result = token_parser.find_next_multi_char(input, chars)
+
+        self.assertEqual(expected, result)
+
+
+class TestParseTag(unittest.TestCase):
+    def test_close_tag(self):
+        input = '[/banana]'
+        expected = 'close_tag', 'banana', None
+
+        result = token_parser.parse_tag(input)
+
+        self.assertEqual(expected, result)
+
+    def test_bad_close_tag(self):
+        input = "[/This isn't a close tag!]"
+        expected = None
+
+        result = token_parser.parse_tag(input)
+
+        self.assertEqual(expected, result)
+
+    def test_open_no_attrs(self):
+        input = '[an-open-tag]'
+        expected = 'start_tag', 'an-open-tag', ()
+
+        result = token_parser.parse_tag(input)
+
+        self.assertEqual(expected, result)
+
+    def test_open_with_attrs(self):
+        input = '[an-open-tag attr-a="Banana"  \t attr-b="apple" attr-b="this is a \\" double quote"]'
+        expected_attrs = (
+            ('attr-a', 'Banana'),
+            ('attr-b', 'apple'),
+            ('attr-b', r'this is a " double quote'),
+        )
+        expected = 'start_tag', 'an-open-tag', expected_attrs
+
+        result = token_parser.parse_tag(input)
+
+        self.assertEqual(expected, result)
+
+    def test_bad_open_tag_name(self):
+        input = '[a borked open tag]'
+        expected = None
+
+        result = token_parser.parse_tag(input)
+
+        self.assertEqual(expected, result)
+
+    def test_bad_open_tag_attrs(self):
+        input = '[an-open-tag this="good" this="is" not=\'good\']'
+        expected = None
+
+        result = token_parser.parse_tag(input)
+
+        self.assertEqual(expected, result)
+
+
+class TestBaseToken(unittest.TestCase):
+    def test_repr(self):
+        # This is just to make sure it doesn't do anything silly,
+        # Not too concerned with the exact form.
+        token = token_parser.BaseToken('something', (1, 2))
+        repr(token)
+
+
 class TestTokenParser(unittest.TestCase):
     maxDiff = None
 
@@ -164,6 +260,7 @@ class TestTokenParser(unittest.TestCase):
         expected_tokens = [
             token_parser.BadSyntaxToken('[/banana tree]', (0, 14), None),
         ]
+        self._testy(input_str, expected_tokens)
 
     def test_salvagable_invalid_open_tag_short_circuit(self):
         input_str = '[bananas [apples]'
@@ -221,3 +318,9 @@ class TestTokenParser(unittest.TestCase):
         input_str = '[]'
         expected_tokens = [token_parser.BadSyntaxToken('[]', (0, 2), None)]
         self._testy(input_str, expected_tokens)
+
+
+
+
+
+
