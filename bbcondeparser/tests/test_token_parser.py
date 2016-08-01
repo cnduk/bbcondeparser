@@ -81,6 +81,15 @@ class TestFindNextMultiChar(unittest.TestCase):
 
 
 class TestParseTag(unittest.TestCase):
+    def test_alphanumeric_tag(self):
+        input = '[h1]'
+        expected = 'start_tag', 'h1', ()
+
+        result = token_parser.parse_tag(input)
+
+        self.assertEqual(expected, result)
+
+
     def test_close_tag(self):
         input = '[/banana]'
         expected = 'close_tag', 'banana', None
