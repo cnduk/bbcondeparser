@@ -117,3 +117,13 @@ class TestAllowedTags(unittest.TestCase):
             {TellyTubby1, TellyTubby2, AngryChef},
             LikesRedThingsAndTeletubbies.get_allowed_tags(),
         )
+
+
+class TestBaseMetaTags(unittest.TestCase):
+    def test_newlin_runtime_error(self):
+
+        with self.assertRaises(RuntimeError):
+            class BadTag(tags.BaseTag):
+                tag_name = 'bad_tag'
+                strip_newlines = True
+                convert_newlines = True

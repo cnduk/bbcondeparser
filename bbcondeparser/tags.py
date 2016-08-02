@@ -1,6 +1,6 @@
 import six
 
-from bbcondeparser.utils import escape_html
+from bbcondeparser.utils import convert_newlines, escape_html, strip_newlines
 
 
 class BaseText(object):
@@ -78,6 +78,11 @@ class BaseTagMeta(type):
 
     @staticmethod
     def validate_tag_cls(tag_cls):
+        # strip_newlines and convert_newlines
+        if tag_cls.strip_newlines and tag_cls.convert_newlines:
+            raise RuntimeError(
+                "Cannot enable strip_newlines and convert_newlines"
+                " on {tag_cls.tag_name}".format(tag_cls=tag_cls))
         pass
         # TODO `close_on_newline` vs `self_closing`
         # TODO `self_closing` vs `allowed_tags`
@@ -209,8 +214,9 @@ class BaseTag(object):
 
     # These attributes are about the formating of output text
     #TODO implement convert_newlines, remove_paragraphs
-    convert_newlines = False # change newlines to <br/>
     remove_paragraphs = False # removes <p> from content
+    strip_newlines = False    # Removes newlines from the body
+    convert_newlines = False  # Converts newlines in the body to <br />
 
     def __init__(self, attrs, tree, start_text, end_text):
         """These classes should not be initialized directly
@@ -268,13 +274,31 @@ class BaseTag(object):
     def render_children(self):
         """Return the rendering of child tags/text
         """
-        return ''.join(child.render() for child in self.tree)
+
+        child_text = ''.join(child.render() for child in self.tree)
+
+        if self.convert_newlines:
+            child_text = convert_newlines(child_text)
+
+        if self.strip_newlines:
+            child_text = strip_newlines(child_text)
+
+        if self.trim_whitespace:
+            child_text = child_text.strip()
+
+        return child_text
 
     def render(self):
         """Return the rendering of this tag (including children)
             (N.B. This inherintly includes children, no way not to.
         """
         text = self._render()
+
+        if self.convert_newlines:
+            text = convert_newlines(text)
+
+        if self.strip_newlines:
+            text = strip_newlines(text)
 
         if self.trim_whitespace:
             text = text.strip()
