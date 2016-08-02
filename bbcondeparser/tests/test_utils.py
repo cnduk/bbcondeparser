@@ -88,14 +88,14 @@ class TextNewline(unittest.TestCase):
     def test_normalize_double_double(self):
         # \n\n\n\n => \n\n
         input = 'example\n\n\n\n newline'
-        expected = 'example\n\n newline'
+        expected = 'example\n\n\n\n newline'
         result = utils.normalize_newlines(input)
         self.assertEqual(expected, result)
 
 
     def test_normalize_wat(self):
-        # \r\n\n\r\n => \n\n
+        # \r\n\n\r\n => \n\n\n
         input = 'example\r\n\n\r\n newline'
-        expected = 'example\n\n newline'
+        expected = 'example\n\n\n newline'
         result = utils.normalize_newlines(input)
         self.assertEqual(expected, result)

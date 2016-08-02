@@ -13,8 +13,6 @@ def normalize_newlines(text):
     # \r\n is a single newline on windows
     transformed_text = text.replace('\r\n', '\n')
 
-    # Replace any \n\n\n+ into just twos
-    transformed_text = _normalize_multi_newlines_re.sub('\n\n', transformed_text)
     return transformed_text
 
 
