@@ -49,73 +49,73 @@ class TestSalvageTagOffset(unittest.TestCase):
 
 class TestFindNextMultiChar(unittest.TestCase):
     def test_case_1(self):
-        input = '01234567'
+        input_str = '01234567'
         chars = '56z'
 
         expected = 5
 
-        result = token_parser.find_next_multi_char(input, chars)
+        result = token_parser.find_next_multi_char(input_str, chars)
 
         self.assertEqual(expected, result)
 
     def test_case_2(self):
-        input = '0123a5a7b9'
+        input_str = '0123a5a7b9'
         chars = 'ba'
         start = 7
 
         expected = 8
 
-        result = token_parser.find_next_multi_char(input, chars, start)
+        result = token_parser.find_next_multi_char(input_str, chars, start)
 
         self.assertEqual(expected, result)
 
     def test_not_found(self):
-        input = '0000000000'
+        input_str = '0000000000'
         chars = 'pvfjaegsegr'
 
         expected = -1
 
-        result = token_parser.find_next_multi_char(input, chars)
+        result = token_parser.find_next_multi_char(input_str, chars)
 
         self.assertEqual(expected, result)
 
 
 class TestParseTag(unittest.TestCase):
     def test_alphanumeric_tag(self):
-        input = '[h1]'
+        input_str = '[h1]'
         expected = 'open_tag', 'h1', ()
 
-        result = token_parser.parse_tag(input)
+        result = token_parser.parse_tag(input_str)
 
         self.assertEqual(expected, result)
 
 
     def test_close_tag(self):
-        input = '[/banana]'
+        input_str = '[/banana]'
         expected = 'close_tag', 'banana', None
 
-        result = token_parser.parse_tag(input)
+        result = token_parser.parse_tag(input_str)
 
         self.assertEqual(expected, result)
 
     def test_bad_close_tag(self):
-        input = "[/This isn't a close tag!]"
+        input_str = "[/This isn't a close tag!]"
         expected = None
 
-        result = token_parser.parse_tag(input)
+        result = token_parser.parse_tag(input_str)
 
         self.assertEqual(expected, result)
 
     def test_open_no_attrs(self):
-        input = '[an-open-tag]'
+        input_str = '[an-open-tag]'
         expected = 'open_tag', 'an-open-tag', ()
 
-        result = token_parser.parse_tag(input)
+        result = token_parser.parse_tag(input_str)
 
         self.assertEqual(expected, result)
 
     def test_open_with_attrs(self):
-        input = '[an-open-tag attr-a="Banana"  \t attr-b="apple" attr-b="this is a \\" double quote"]'
+        input_str = '[an-open-tag attr-a="Banana"  \t attr-b="apple" attr-b="this is a \\" double quote"]'
         expected_attrs = (
             ('attr-a', 'Banana'),
             ('attr-b', 'apple'),
@@ -123,23 +123,23 @@ class TestParseTag(unittest.TestCase):
         )
         expected = 'open_tag', 'an-open-tag', expected_attrs
 
-        result = token_parser.parse_tag(input)
+        result = token_parser.parse_tag(input_str)
 
         self.assertEqual(expected, result)
 
     def test_bad_open_tag_name(self):
-        input = '[a borked open tag]'
+        input_str = '[a borked open tag]'
         expected = None
 
-        result = token_parser.parse_tag(input)
+        result = token_parser.parse_tag(input_str)
 
         self.assertEqual(expected, result)
 
     def test_bad_open_tag_attrs(self):
-        input = '[an-open-tag this="good" this="is" not=\'good\']'
+        input_str = '[an-open-tag this="good" this="is" not=\'good\']'
         expected = None
 
-        result = token_parser.parse_tag(input)
+        result = token_parser.parse_tag(input_str)
 
         self.assertEqual(expected, result)
 

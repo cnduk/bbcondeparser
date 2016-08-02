@@ -32,10 +32,10 @@ class TestCreateTagDict(unittest.TestCase):
         class Tag3(MockBaseTag):
             tag_name = 'oranges'
 
-        input = [Tag1, Tag2, Tag3, Tag2] # Duplicates are accepted
+        input_text = [Tag1, Tag2, Tag3, Tag2] # Duplicates are accepted
         expected = {'apples': Tag1, 'bananas': Tag2, 'oranges': Tag3}
 
-        result = tree_parser.create_tag_dict(input)
+        result = tree_parser.create_tag_dict(input_text)
 
         self.assertEqual(expected, result)
 
@@ -49,10 +49,10 @@ class TestCreateTagDict(unittest.TestCase):
         class Tag3(MockBaseTag):
             tag_name = 'apples'
 
-        input = [Tag1, Tag2, Tag3]
+        input_text = [Tag1, Tag2, Tag3]
 
         with self.assertRaises(RuntimeError):
-            tree_parser.create_tag_dict(input)
+            tree_parser.create_tag_dict(input_text)
 
 
 class TestParseTree(unittest.TestCase):
