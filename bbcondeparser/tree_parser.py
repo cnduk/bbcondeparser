@@ -9,7 +9,7 @@ from bbcondeparser.token_parser import (
     CloseTagToken,
 )
 
-from bbcondeparser.tags import ErrorText, RawText, parse_tag_set
+from bbcondeparser.tags import ErrorText, RawText, NewlineText, parse_tag_set
 
 TAG_START = 'tag_start'
 TAG_END = 'tag_end'
@@ -21,6 +21,7 @@ class BaseTreeParser(object):
 
     raw_text_class = RawText
     error_text_class = ErrorText
+    newline_text_class = NewlineText
 
     def __init__(self, text):
         self.raw_text = text
@@ -31,7 +32,8 @@ class BaseTreeParser(object):
         self.tree = parse_tree(
             text, tags,
             raw_text_class=self.raw_text_class,
-            error_text_class=self.error_text_class
+            error_text_class=self.error_text_class,
+            newline_text_class=self.newline_text_class,
         )
 
     def render(self):
@@ -80,6 +82,7 @@ class TreeStack(object):
 
 def parse_tree(
     raw_text, tags, raw_text_class=RawText, error_text_class=ErrorText,
+    newline_text_class=NewlineText,
 ):
     """`raw_text` is the raw bb code (conde format) to be parsed
         `tags` should be an iterable of tag classes allowed in the text
@@ -141,7 +144,10 @@ def parse_tree(
 
         elif isinstance(token, NewlineToken):
             if not stack.want_close_on_newline():
-                tree.append(raw_text_class(token.text))
+                if tree and isinstance(tree[-1], newline_text_class):
+                    tree[-1].add_newline(token.text)
+                else:
+                    tree.append(newline_text_class(token.text))
 
             else:
                 while stack:

@@ -1,6 +1,7 @@
 import unittest
 
-from bbcondeparser.tags import RawText, ErrorText, BaseTag, BaseText
+from bbcondeparser.tags import (
+    RawText, ErrorText, BaseTag, BaseText, NewlineText)
 from bbcondeparser import tree_parser
 
 
@@ -410,3 +411,32 @@ class TestTreeParser(unittest.TestCase):
         result_text = inst.render()
 
         self.assertEqual(expected_text, result_text)
+
+
+class TestTreeParserNewline(unittest.TestCase):
+    def test_newline_tag(self):
+        input_text = 'butts\nbutts'
+        expected_tree = [
+            RawText('butts'),
+            NewlineText('\n'),
+            RawText('butts'),
+        ]
+
+        result = tree_parser.parse_tree(input_text, [])
+
+        self.assertEqual(expected_tree, result)
+
+
+    def test_newline_concat(self):
+        input_text = 'butts\n\nbutts\n\n\nbutts'
+        expected_tree = [
+            RawText('butts'),
+            NewlineText('\n\n'),
+            RawText('butts'),
+            NewlineText('\n\n\n'),
+            RawText('butts'),
+        ]
+
+        result = tree_parser.parse_tree(input_text, [])
+
+        self.assertEqual(expected_tree, result)

@@ -35,6 +35,16 @@ class RawText(BaseText):
     pass
 
 
+class NewlineText(BaseText):
+
+    def __init__(self, *args, **kwargs):
+        super(NewlineText, self).__init__(*args, **kwargs)
+        self.count = 1
+
+    def add_newline(self, text):
+        self.text += text
+
+
 class ErrorText(BaseText):
     """This class is to hold source text which could not be parsed.
         handles escaping html within the text.
