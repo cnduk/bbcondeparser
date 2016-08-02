@@ -1,4 +1,6 @@
 *.swp
+*~
+
 *.pyc
 *.pyo
 
@@ -6,3 +8,7 @@
 .coverage
 .coveragerc
 bbcondeparser.egg-info/
+
+/.eggs
+/build
+/dist
