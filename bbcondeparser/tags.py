@@ -276,9 +276,9 @@ class BaseTag(object):
         if len(fmt_child_list):
             fmt_child_list = '\n' + fmt_child_list + '\n'
 
-        return '{}({} tree({}) {} {{{}}})'.format(
-            self.__class__.__name__, self.start_text, fmt_child_list,
-            self.end_text, self.attrs
+        return '{}({} tree({}) {} {})'.format(
+            self.__class__.__name__, repr(self.start_text), fmt_child_list,
+            repr(self.end_text), self.attrs
         )
 
     def render_children(self):

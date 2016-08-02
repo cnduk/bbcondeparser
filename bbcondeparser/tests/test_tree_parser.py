@@ -1,7 +1,8 @@
 import unittest
 
 from bbcondeparser.tags import (
-    RawText, ErrorText, BaseTag, BaseText, NewlineText)
+    RawText, ErrorText, BaseTag, BaseText, NewlineText, TagCategory
+)
 from bbcondeparser import tree_parser
 
 
@@ -265,7 +266,7 @@ class TestParseTree(unittest.TestCase):
 
         self.assertEqual(expected_tree, result)
 
-    def test_close_out_tag_newline_multi(self):
+    def test_close_outer_tag_newline_multi(self):
         class Tag1(MockBaseTag):
             tag_name = 'a'
             close_on_newline = True
@@ -349,6 +350,106 @@ class TestParseTree(unittest.TestCase):
 
         self.assertEqual(expected_tree, result)
 
+    def test_tag_ctx_honoured_in_error_short_circuit_closetag(self):
+        class InnerTag(MockBaseTag):
+            tag_name = 'C'
+            self_closing = True
+            allowed_tags = []
+
+        class MiddleTag(MockBaseTag):
+            tag_name = 'B'
+            allowed_tags = [InnerTag]
+
+        class OuterTag(MockBaseTag):
+            tag_name = 'A'
+            allowed_tags = [MiddleTag]
+
+        tags = [OuterTag]
+        input_text = '[A][B][C][/A]'
+
+        # So in this example, we need to ensure that when we get to the
+        # close A, we correctly assert that the open B is missing its close
+        # tag, so it is in error. We then also need to ensure we re-evaluate
+        # the C tag. As B is missing its close, we do not know its scope,
+        # so we the C is hoisted up into A's scope, and it is not valid
+        # under A's scope (and is not a registered "ignored" tag),
+        # so it needs to be marked error as well.
+
+        # This is obvious, but was missed in the first couple iteration of the
+        # tree parser, and I wanted to ensure that this situation makes sense.
+
+        expected_tree = [
+            OuterTag((),
+                [
+                    ErrorText("[B]"),
+                    ErrorText("[C]"),
+                ],
+                '[A]', '[/A]',
+            ),
+        ]
+
+        result = tree_parser.parse_tree(input_text, tags)
+
+        self.assertEqual(expected_tree, result)
+
+    def test_tag_ctx_honoured_in_error_short_circuit_newline(self):
+        # See above, also awfully named function for explanation
+        # test_tag_ctx_honoured_in_error_short_circuit_closetag
+        class InnerTag(MockBaseTag):
+            tag_name = 'C'
+            self_closing = True
+            allowed_tags = []
+
+        class MiddleTag(MockBaseTag):
+            tag_name = 'B'
+            allowed_tags = [InnerTag]
+
+        class OuterTag(MockBaseTag):
+            tag_name = 'A'
+            allowed_tags = [MiddleTag]
+            close_on_newline = True
+
+        tags = [OuterTag]
+        input_text = '[A][B][C]\n'
+
+        expected_tree = [
+            OuterTag((),
+                [
+                    ErrorText("[B]"),
+                    ErrorText("[C]"),
+                ],
+                '[A]', '\n',
+            ),
+        ]
+
+        result = tree_parser.parse_tree(input_text, tags)
+
+        self.assertEqual(expected_tree, result)
+
+    def test_tag_ctx_honoured_in_error_EOF(self):
+        # See above, also awfully named function for explanation
+        # test_tag_ctx_honoured_in_error_short_circuit_closetag
+        class InnerTag(MockBaseTag):
+            tag_name = 'B'
+            self_closing = True
+
+        class OuterTag(MockBaseTag):
+            tag_name = 'A'
+            allowed_tags = [InnerTag]
+
+        tags = [OuterTag]
+
+        input_text = '[A][B]'
+
+        expected_tree = [
+            ErrorText("[A]"),
+            ErrorText("[B]"),
+        ]
+
+        result = tree_parser.parse_tree(input_text, tags)
+
+        self.assertEqual(expected_tree, result)
+
     def test_generic_1(self):
         class Tag1(MockBaseTag):
             tag_name = 'a'
@@ -375,6 +476,33 @@ class TestParseTree(unittest.TestCase):
 
         self.assertEqual(expected_tree, result)
 
+    def test_generic_2(self):
+        ACat = TagCategory('A')
+        BCat = TagCategory('B')
+
+        class ATag(MockBaseTag):
+            tag_name = 'A'
+            allowed_tags = [BCat]
+            tag_categories = [ACat]
+
+        class BTag(MockBaseTag):
+            tag_name = 'B'
+            allowed_tags = [ACat]
+            tag_categories = [BCat]
+
+        tags = [ATag]
+        input_text = '[A][B][A][/A][/A]'
+
+        expected_tree = [
+            ATag((), [
+                ErrorText('[B]'), # missing close
+                ATag.null_class((), [], '[A]', '[/A]'), # Not allowed in context of A
+            ], '[A]', '[/A]'),
+        ]
+
+        result = tree_parser.parse_tree(input_text, tags)
+
+        self.assertEqual(expected_tree, result)
 
 class TestTreeParser(unittest.TestCase):
     def test_parser(self):
