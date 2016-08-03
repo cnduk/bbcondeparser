@@ -522,8 +522,8 @@ class TestTreeParser(unittest.TestCase):
                 return "I SHOULD HAVE BEEN IGNORED"
 
         class UpperCaseText(BaseText):
-            def render(self):
-                return self.get_raw().upper()
+            def _render(self):
+                return self.text.upper()
 
         input_text = "[b][i][ignored]It's not a tumor![/ignored][/i][/b]"
 

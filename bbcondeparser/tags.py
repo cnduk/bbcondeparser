@@ -8,7 +8,7 @@ class BaseText(object):
         self.text = text
 
     def render(self, escape=True):
-        text = self.get_raw()
+        text = self._render()
 
         if escape:
             text = escape_html(text)
@@ -19,9 +19,9 @@ class BaseText(object):
         return self.__class__ == other.__class__ and self.text == other.text
 
     def __repr__(self):
-        return "{}({})".format(self.__class__.__name__, repr(self.get_raw()))
+        return "{}({})".format(self.__class__.__name__, repr(self.text))
 
-    def get_raw(self):
+    def _render(self):
         return self.text
 
     def render_raw(self):
@@ -58,7 +58,7 @@ class ErrorText(BaseText):
 
     def __repr__(self):
         return "{}('{}': {})".format(
-            self.__class__.__name__, self.reason, repr(self.get_raw()),
+            self.__class__.__name__, self.reason, repr(self.text),
         )
 
 
