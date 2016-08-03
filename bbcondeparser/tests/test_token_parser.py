@@ -328,8 +328,22 @@ class TestTokenParser(unittest.TestCase):
         expected_tokens = [token_parser.BadSyntaxToken('[]', (0, 2), None)]
         self._testy(input_str, expected_tokens)
 
+    def test_newline_unix(self):
+        input_str = u'\n'
+        expected_tokens = [token_parser.NewlineToken(u'\n', (0, 1))]
+        self._testy(input_str, expected_tokens)
 
+    def test_newline_dos(self):
+        input_str = u'\r\n'
+        expected_tokens = [token_parser.NewlineToken(u'\r\n', (0, 2))]
+        self._testy(input_str, expected_tokens)
 
-
-
-
+    def test_mixed_newlines(self):
+        # dos (\r\n), unix (\n), mac (\r),
+        input_str = '\r\n\n\r'
+        expected_tokens = [
+            token_parser.NewlineToken('\r\n', (0, 2)),
+            token_parser.NewlineToken('\n', (2, 3)),
+            token_parser.NewlineToken('\r', (3, 4)),
+        ]
+        self._testy(input_str, expected_tokens)

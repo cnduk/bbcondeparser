@@ -1,7 +1,19 @@
 import re
 
 from bbcondeparser.utils import (
-    to_unicode, normalize_newlines, remove_backslash_escapes, find_next_multi_char
+    to_unicode, remove_backslash_escapes, find_next_multi_char
+)
+
+NEWLINE_CHARS = (
+    '\n' # LF - Line Feed
+    '\r' # CR - Carriage Return
+    '\v' # VT - Vertical Tab
+    '\f' # FF - Form Feed
+    u'\u2029' # Paragraph separator
+    u'\u2028' # Line separator
+    # u'\u0085' # NEL - NExt Line. Ignored because it's not common,
+                # and Windows uses it as an elipsis.
+    # DOS newlines \r\n are special cased in the parser.
 )
 
 
@@ -64,8 +76,7 @@ class CloseTagToken(BaseToken):
 class TokenParser(object):
     def __init__(self, raw_text):
         self.original_text = raw_text
-        unicode_text = to_unicode(raw_text)
-        self.text = normalize_newlines(unicode_text)
+        self.text = to_unicode(raw_text)
 
         self.parse_tokens()
 
@@ -73,43 +84,68 @@ class TokenParser(object):
         self.tokens = []
         self.curr_pos = 0
 
+        search_chars = NEWLINE_CHARS + u'['
+
         while self.curr_pos < len(self.text):
             self.last_pos = self.curr_pos
             self.curr_pos = find_next_multi_char(
-                    self.text, '[\n', self.curr_pos)
+                    self.text, search_chars, self.curr_pos)
 
             # If we've moved past characters other than our search characters,
             # Then that's just plain text.
             # (if curr_pos is -1 (notfound) this is skipped)
             if self.last_pos < self.curr_pos:
-                self.tokens.append(TextToken(
+                self.add_text_token(
                     self.text[self.last_pos:self.curr_pos],
                     (self.last_pos, self.curr_pos),
-                ))
+                )
 
             # Reached the end of the text. We know that we have scanned past
             # some text because of the while clause.
             if self.curr_pos == -1:
                 self.curr_pos = len(self.text)
                 location = (self.last_pos, self.curr_pos)
-                self.tokens.append(TextToken(
+                self.add_text_token(
                     self.text[self.last_pos:self.curr_pos], location
-                ))
+                )
 
-            elif self.text[self.curr_pos] == '\n':
+            elif self.text[self.curr_pos] == '[':
+                self.parse_tag_token()
+
+            # self.text[self.curr_pos] in NEWLINE_CHARS:
+            else:
                 self.process_newline()
 
-            else: # self.text[self.curr_pos] == '[':
-                self.parse_tag_token()
 
             # Move onto next character to start processing from
             self.curr_pos += 1
 
-    def process_newline(self):
-        assert self.text[self.curr_pos] == '\n'
+    def add_text_token(self, text, location):
+        self.tokens.append(TextToken(text, location))
 
-        location = (self.curr_pos,self.curr_pos+1)
-        self.tokens.append(NewlineToken('\n', location))
+    def process_newline(self):
+        assert self.text[self.curr_pos] in NEWLINE_CHARS
+
+        char = self.text[self.curr_pos]
+        location = (self.curr_pos, self.curr_pos+1)
+
+        # either it's a dos newline \r\n, so need to consume two characters,
+        # or it's just a single \n, \r or a newfangled unicode character.
+        # Note \n\r is not a dos newline, it is a 'nix and mac newline.
+        if char == '\r':
+            try:
+                next_char = self.text[self.curr_pos+1]
+            except IndexError:
+                next_char = None
+
+            if next_char == '\n':
+                # woo we've found a dos newline! so consume the next
+                # character as well.
+                char += next_char
+                location = (self.curr_pos, self.curr_pos+2)
+                self.curr_pos += 1
+
+        self.tokens.append(NewlineToken(char, location))
 
     def parse_tag_token(self):
         assert self.text[self.curr_pos] == '['

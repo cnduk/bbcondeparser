@@ -568,3 +568,15 @@ class TestTreeParserNewline(unittest.TestCase):
         result = tree_parser.parse_tree(input_text, [])
 
         self.assertEqual(expected_tree, result)
+
+    def test_dosnewline(self):
+        input_text = 'butts\r\nbutts'
+        expected_tree = [
+            RawText('butts'),
+            NewlineText('\r\n'),
+            RawText('butts'),
+        ]
+
+        result = tree_parser.parse_tree(input_text, [])
+
+        self.assertEqual(expected_tree, result)

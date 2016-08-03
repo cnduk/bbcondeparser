@@ -2,19 +2,6 @@ import sys
 import re
 import cgi
 
-_normalize_multi_newlines_re = re.compile('\n{3,}')
-def normalize_newlines(text):
-    """Tidies up newlines in the block of text
-    \r = CR (Carriage Return) - Used as a new line character in Mac OS before X
-    \n = LF (Line Feed) - Used as a new line character in Unix/Mac OS X
-    \r\n = CR + LF - Used as a new line character in Windows
-    """
-    # Replace all \r\n newlines with \n
-    # \r\n is a single newline on windows
-    transformed_text = text.replace('\r\n', '\n')
-
-    return transformed_text
-
 
 if sys.version_info.major == 2:
     def to_unicode(string_like_object):
