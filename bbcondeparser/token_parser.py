@@ -21,6 +21,7 @@ def get_tokens(text):
     parser= TokenParser(text)
     return parser.tokens
 
+
 class BaseToken(object):
     """An object to represent a token within the source text
     """
@@ -203,9 +204,9 @@ class TokenParser(object):
 
         self.curr_pos = end_of_tag_loc
 
+
 _whitespace_re = re.compile('\s+')
 
-# Tag names can be all letters or a mixture of numbers and letters
 _tag_name_re_str = '[\w-]+'
 _attr_re_str = r'([a-zA-Z-]+)="((?:[^\\"]|\\.)*)"'
 _attrs_re_str = r'^(?:\s*{_attr_re_str}\s*)*$'.format(**locals())

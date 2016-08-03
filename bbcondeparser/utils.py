@@ -16,7 +16,7 @@ if sys.version_info.major == 2:
             return string_like_object.decode('utf-8')
 else:
     def to_unicode(string_like_object):
-        """Under python>=3, this function does nothing
+        """With python>=3, this function does nothing
         """
         return string_like_object
 
