@@ -2,6 +2,7 @@ import six
 
 from bbcondeparser.utils import convert_newlines, escape_html, strip_newlines
 
+NEWLINE_STR = '\n'
 
 class BaseText(object):
     def __init__(self, text):
@@ -42,7 +43,14 @@ class NewlineText(BaseText):
         self.count = 1
 
     def add_newline(self, text):
+        self.count += 1
         self.text += text
+
+    def _render(self, escape=True):
+        if self.count == 1:
+            return NEWLINE_STR
+        else:
+            return NEWLINE_STR * 2
 
 
 class ErrorText(BaseText):
