@@ -127,3 +127,47 @@ class TestBaseMetaTags(unittest.TestCase):
                 tag_name = 'bad_tag'
                 strip_newlines = True
                 convert_newlines = True
+
+
+class TestNewlineTextCount(unittest.TestCase):
+    def test_add_newline(self):
+        test_newline = tags.NewlineText(tags.NEWLINE_STR)
+        test_newline.add_newline(tags.NEWLINE_STR)
+        self.assertEqual(test_newline.count, 2)
+
+
+class TestNewlineTextRender(unittest.TestCase):
+    def test_render_one_line(self):
+        test_newline = tags.NewlineText(tags.NEWLINE_STR)
+        self.assertEqual(test_newline.render(False), tags.NEWLINE_HTML)
+
+    def test_render_two_line(self):
+        test_newline = tags.NewlineText(tags.NEWLINE_STR)
+        test_newline.add_newline(tags.NEWLINE_STR)
+        self.assertEqual(test_newline.render(False), tags.NEWLINE_HTML*2)
+
+    def test_render_x_line(self):
+        test_newline = tags.NewlineText(tags.NEWLINE_STR)
+        test_newline.add_newline(tags.NEWLINE_STR)
+        test_newline.add_newline(tags.NEWLINE_STR)
+        test_newline.add_newline(tags.NEWLINE_STR)
+        self.assertEqual(test_newline.render(False), tags.NEWLINE_HTML*2)
+
+
+class TestNewlineTextRenderRaw(unittest.TestCase):
+    def test_render_one_line(self):
+        test_newline = tags.NewlineText(tags.NEWLINE_STR)
+        self.assertEqual(test_newline.render_raw(), tags.NEWLINE_STR)
+
+    def test_render_two_line(self):
+        test_newline = tags.NewlineText(tags.NEWLINE_STR)
+        test_newline.add_newline(tags.NEWLINE_STR)
+        self.assertEqual(test_newline.render_raw(), tags.NEWLINE_STR*2)
+
+    def test_render_x_line(self):
+        test_newline = tags.NewlineText(tags.NEWLINE_STR)
+        test_newline.add_newline(tags.NEWLINE_STR)
+        test_newline.add_newline(tags.NEWLINE_STR)
+        test_newline.add_newline(tags.NEWLINE_STR)
+        self.assertEqual(test_newline.render_raw(), tags.NEWLINE_STR*2)
+
