@@ -239,7 +239,6 @@ class BaseTag(object):
 
     # These attributes are about the formating of output text
     #TODO implement convert_newlines, remove_paragraphs
-    remove_paragraphs = False # removes <p> from content
     strip_newlines = False    # Removes newlines from the body
     convert_newlines = False  # Converts newlines in the body to <br />
 
