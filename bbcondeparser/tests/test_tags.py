@@ -139,35 +139,16 @@ class TestNewlineTextCount(unittest.TestCase):
 class TestNewlineTextRender(unittest.TestCase):
     def test_render_one_line(self):
         test_newline = tags.NewlineText(tags.NEWLINE_STR)
-        self.assertEqual(test_newline.render(False), tags.NEWLINE_HTML)
+        self.assertEqual(test_newline.render(False), tags.NEWLINE_STR)
 
     def test_render_two_line(self):
         test_newline = tags.NewlineText(tags.NEWLINE_STR)
         test_newline.add_newline(tags.NEWLINE_STR)
-        self.assertEqual(test_newline.render(False), tags.NEWLINE_HTML*2)
+        self.assertEqual(test_newline.render(False), tags.NEWLINE_STR*2)
 
     def test_render_x_line(self):
         test_newline = tags.NewlineText(tags.NEWLINE_STR)
         test_newline.add_newline(tags.NEWLINE_STR)
         test_newline.add_newline(tags.NEWLINE_STR)
         test_newline.add_newline(tags.NEWLINE_STR)
-        self.assertEqual(test_newline.render(False), tags.NEWLINE_HTML*2)
-
-
-class TestNewlineTextRenderRaw(unittest.TestCase):
-    def test_render_one_line(self):
-        test_newline = tags.NewlineText(tags.NEWLINE_STR)
-        self.assertEqual(test_newline.render_raw(), tags.NEWLINE_STR)
-
-    def test_render_two_line(self):
-        test_newline = tags.NewlineText(tags.NEWLINE_STR)
-        test_newline.add_newline(tags.NEWLINE_STR)
-        self.assertEqual(test_newline.render_raw(), tags.NEWLINE_STR*2)
-
-    def test_render_x_line(self):
-        test_newline = tags.NewlineText(tags.NEWLINE_STR)
-        test_newline.add_newline(tags.NEWLINE_STR)
-        test_newline.add_newline(tags.NEWLINE_STR)
-        test_newline.add_newline(tags.NEWLINE_STR)
-        self.assertEqual(test_newline.render_raw(), tags.NEWLINE_STR*2)
-
+        self.assertEqual(test_newline.render(False), tags.NEWLINE_STR*2)

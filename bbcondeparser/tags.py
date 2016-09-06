@@ -49,12 +49,6 @@ class NewlineText(BaseText):
 
     def _render(self, escape=True):
         if self.count == 1:
-            return NEWLINE_HTML
-        else:
-            return NEWLINE_HTML * 2
-
-    def render_raw(self):
-        if self.count == 1:
             return NEWLINE_STR
         else:
             return NEWLINE_STR * 2
@@ -467,7 +461,7 @@ def render_paragraphs(tree):
         # Newline
         elif isinstance(node, NewlineText):
             if node.count == 1:
-                rendered_children.append(node.render_raw())
+                rendered_children.append(node.render())
             elif node.count == 2:
                 if inside_paragraph:
                     rendered_children.append('</p>')
