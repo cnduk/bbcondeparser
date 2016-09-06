@@ -143,8 +143,25 @@ class CodeTag(BaseTag):
         return '<code><pre>' + self.render_children_raw() + '</code></pre>'
 
 
+class ParagraphsTag(BaseTag):
+    tag_name = 'p'
+    convert_paragraphs = True
+
+    def _render(self):
+        return self.render_children()
+
+
+class ParagraphsTagWithLineBreaks(BaseTag):
+    tag_name = 'pp'
+    convert_paragraphs = True
+    convert_newlines = True
+
+    def _render(self):
+        return self.render_children()
+
+
 class Parser(BaseTreeParser):
-    tags = [SIMPLE_TAGS, InfoBox, CodeTag]
+    tags = [SIMPLE_TAGS, InfoBox, CodeTag, ParagraphsTag, ParagraphsTagWithLineBreaks]
     ignored_tags = [Image]
 
 
@@ -209,3 +226,44 @@ class TestCodeTag(BaseTesty):
             "[code][b][i]Hello, world![/i][/b][/code]",
             "<code><pre>[b][i]Hello, world![/i][/b]</code></pre>",
         )
+
+
+class TestTagRenderParagraphs(BaseTesty):
+    def test_render_simple(self):
+        self._testy(
+            '[p]example 1\n\nexample 2[/p]',
+            '<p>example 1</p><p>example 2</p>'
+        )
+
+    def test_render_multiple(self):
+        self._testy(
+            '[p]example 1\n\nexample 2\nexample 3\n\nexample 4\n[/p]',
+            '<p>example 1</p><p>example 2\nexample 3</p><p>example 4\n</p>'
+        )
+
+    def test_render_inline(self):
+        self._testy(
+            '[p]example 1\n\nexample 2\nexample 3\n\n[b]example 4[/b]\n[/p]',
+            '<p>example 1</p><p>example 2\nexample 3</p><p><b>example 4</b>\n</p>'
+        )
+
+
+class TestTagRenderParagraphsLineBreaks(BaseTesty):
+    def test_render_simple(self):
+        self._testy(
+            '[pp]example 1\n\nexample 2[/pp]',
+            '<p>example 1</p><p>example 2</p>'
+        )
+
+    def test_render_multiple(self):
+        self._testy(
+            '[pp]example 1\n\nexample 2\nexample 3\n\nexample 4\n[/pp]',
+            '<p>example 1</p><p>example 2<br />example 3</p><p>example 4<br /></p>'
+        )
+
+    def test_render_inline(self):
+        self._testy(
+            '[pp]example 1\n\nexample 2\nexample 3\n\n[b]example 4[/b]\n[/pp]',
+            '<p>example 1</p><p>example 2<br />example 3</p><p><b>example 4</b><br /></p>'
+        )
+

@@ -239,8 +239,9 @@ class BaseTag(object):
 
     # These attributes are about the formating of output text
     #TODO implement convert_newlines, remove_paragraphs
-    strip_newlines = False    # Removes newlines from the body
-    convert_newlines = False  # Converts newlines in the body to <br />
+    strip_newlines = False         # Removes newlines from the body
+    convert_newlines = False       # Converts newlines in the body to <br />
+    convert_paragraphs = False     # Converts newlines to paragraphs
 
     def __init__(self, attrs, tree, start_text, end_text):
         """These classes should not be initialized directly
@@ -299,7 +300,10 @@ class BaseTag(object):
         """Return the rendering of child tags/text
         """
 
-        child_text = ''.join(child.render() for child in self.tree)
+        if self.convert_paragraphs:
+            child_text = render_paragraphs(self.tree)
+        else:
+            child_text = ''.join(child.render() for child in self.tree)
 
         if self.convert_newlines:
             child_text = convert_newlines(child_text)
@@ -427,3 +431,61 @@ def parse_tag_set(tag_set):
         seen.add(tag.tag_name)
 
     return tags
+
+
+
+def get_paragraph_insert_index(tree):
+    """Walks through the tree trying to find a place to insert a paragraph
+    """
+
+    length = len(tree) - 1
+    while length >= 0:
+        if tree[length] in ('\n', '<p>', '</p>'):
+            return length + 1
+        length -= 1
+    return 0
+
+
+def render_paragraphs(tree):
+    """Walks through the nodes in the tree trying to work out where the
+       correct location is to insert paragraph tags
+    """
+
+    rendered_children = []
+    inside_paragraph = False
+
+    for node_index, node in enumerate(tree):
+
+        # Raw text
+        if isinstance(node, RawText):
+            if not inside_paragraph:
+                paragraph_index = get_paragraph_insert_index(rendered_children)
+                rendered_children.insert(paragraph_index, '<p>')
+                inside_paragraph = True
+            rendered_children.append(node.render())
+
+        # Newline
+        elif isinstance(node, NewlineText):
+            if node.count == 1:
+                rendered_children.append(node.render_raw())
+            elif node.count == 2:
+                if inside_paragraph:
+                    rendered_children.append('</p>')
+                    inside_paragraph = False
+                else:
+                    rendered_children.append('<p>')
+                    inside_paragraph = True
+
+        # Any tag that can be rendered
+        elif isinstance(node, BaseTag):
+            if not inside_paragraph:
+                rendered_children.append('<p>')
+                inside_paragraph = True
+            rendered_children.append(node.render())
+
+    # If we're still inside a paragraph, close it
+    if inside_paragraph:
+        rendered_children.append('</p>')
+        inside_paragraph = False
+
+    return ''.join(rendered_children)
