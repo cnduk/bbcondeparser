@@ -143,6 +143,13 @@ class CodeTag(BaseTag):
         return '<code><pre>' + self.render_children_raw() + '</code></pre>'
 
 
+class NoParagraphsTag(BaseTag):
+    tag_name = 'nope'
+
+    def _render(self):
+        return self.render_children()
+
+
 class ParagraphsTag(BaseTag):
     tag_name = 'p'
     convert_paragraphs = True
@@ -161,7 +168,8 @@ class ParagraphsTagWithLineBreaks(BaseTag):
 
 
 class Parser(BaseTreeParser):
-    tags = [SIMPLE_TAGS, InfoBox, CodeTag, ParagraphsTag, ParagraphsTagWithLineBreaks]
+    tags = [SIMPLE_TAGS, InfoBox, CodeTag, NoParagraphsTag, ParagraphsTag,
+        ParagraphsTagWithLineBreaks]
     ignored_tags = [Image]
 
 
@@ -267,3 +275,16 @@ class TestTagRenderParagraphsLineBreaks(BaseTesty):
             '<p>example 1</p><p>example 2<br />example 3</p><p><b>example 4</b><br /></p>'
         )
 
+
+class TestTagRenderParagraphsAndNone(BaseTesty):
+    def test_render_simple(self):
+        self._testy(
+            '[p]example 1\n\n[nope]example 2\n\nexample 3[/nope]\n\nexample 4[/p]',
+            '<p>example 1</p><p>example 2\n\nexample 3</p><p>example 4</p>'
+        )
+
+    def test_render_multiple(self):
+        self._testy(
+            '[p]example 1\n\n[nope]example 2\n\nexample 3\n\n[p]example 5\n\nexample 6[/p][/nope]\n\nexample 4[/p]',
+            '<p>example 1</p><p>example 2\n\nexample 3\n\n<p>example 5</p><p>example 6</p></p><p>example 4</p>'
+        )
