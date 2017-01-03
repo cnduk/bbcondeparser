@@ -4,6 +4,10 @@ from bbcondeparser.utils import (
     to_unicode, remove_backslash_escapes, find_next_multi_char
 )
 
+OPEN_CHAR = u'['
+CLOSE_CHAR = u']'
+
+# N.B. This creates a unicode/string!
 NEWLINE_CHARS = (
     '\n' # LF - Line Feed
     '\r' # CR - Carriage Return
@@ -85,7 +89,7 @@ class TokenParser(object):
         self.tokens = []
         self.curr_pos = 0
 
-        search_chars = NEWLINE_CHARS + u'['
+        search_chars = NEWLINE_CHARS + OPEN_CHAR
 
         while self.curr_pos < len(self.text):
             self.last_pos = self.curr_pos
@@ -96,33 +100,29 @@ class TokenParser(object):
             # Then that's just plain text.
             # (if curr_pos is -1 (notfound) this is skipped)
             if self.last_pos < self.curr_pos:
-                self.add_text_token(
-                    self.text[self.last_pos:self.curr_pos],
-                    (self.last_pos, self.curr_pos),
-                )
+                self.add_text_token()
 
             # Reached the end of the text. We know that we have scanned past
             # some text because of the while clause.
             if self.curr_pos == -1:
                 self.curr_pos = len(self.text)
-                location = (self.last_pos, self.curr_pos)
-                self.add_text_token(
-                    self.text[self.last_pos:self.curr_pos], location
-                )
+                self.add_text_token()
 
-            elif self.text[self.curr_pos] == '[':
+            elif self.text[self.curr_pos] == OPEN_CHAR:
                 self.parse_tag_token()
 
             # self.text[self.curr_pos] in NEWLINE_CHARS:
             else:
                 self.process_newline()
 
-
             # Move onto next character to start processing from
             self.curr_pos += 1
 
-    def add_text_token(self, text, location):
-        self.tokens.append(TextToken(text, location))
+    def add_text_token(self):
+        self.tokens.append(TextToken(
+            self.text[self.last_pos:self.curr_pos],
+            (self.last_pos, self.curr_pos),
+        ))
 
     def process_newline(self):
         assert self.text[self.curr_pos] in NEWLINE_CHARS
@@ -149,16 +149,16 @@ class TokenParser(object):
         self.tokens.append(NewlineToken(char, location))
 
     def parse_tag_token(self):
-        assert self.text[self.curr_pos] == '['
+        assert self.text[self.curr_pos] == OPEN_CHAR
 
         end_of_tag_loc = find_next_multi_char(
-                self.text, '][', self.curr_pos+1)
+                self.text, OPEN_CHAR+CLOSE_CHAR, self.curr_pos+1)
 
-        if end_of_tag_loc == -1 or self.text[end_of_tag_loc] == '[':
+        if end_of_tag_loc == -1 or self.text[end_of_tag_loc] == OPEN_CHAR:
             if end_of_tag_loc == -1:
                 end_of_tag_loc = len(self.text)-1
             else:
-                # Need to step back a character so that the '[' will
+                # Need to step back a character so that the OPEN_CHAR will
                 # be processed by the main loop
                 end_of_tag_loc -= 1
 
@@ -221,7 +221,7 @@ _salvage_re = re.compile(
         r'(\[/?(:?{_tag_name_re_str}(\s{_attr_re_str})*)?)'.format(**locals()))
 
 def salvage_tag_offset(text):
-    """`text` should be everything from the open [
+    """`text` should be everything from the OPEN_CHAR
         e.g. if you've one of the following:
             '[boldLorem Ipsum dolor sit [i]amet[/i]'
             '[link loc="www.bananas.com/pic.png" Bananas are the best![/link]'
@@ -238,7 +238,7 @@ def salvage_tag_offset(text):
         returns the offset from the beginning of `text` from
         which text should be salvaged.
     """
-    assert text[0] == '['
+    assert text[0] == OPEN_CHAR
 
     match = _salvage_re.match(text)
     return len(match.groups()[0])
@@ -259,7 +259,7 @@ def parse_tag(text):
                 (on an open tag only, None on end tags)
         returns None on a failed parse
     """
-    assert text[0] == '[' and text[-1] == ']'
+    assert text[0] == OPEN_CHAR and text[-1] == CLOSE_CHAR
     text = text[1:-1]
 
     if not text: # tag was empty (e.g. [])
