@@ -1,21 +1,17 @@
 import six
 
-from bbcondeparser.utils import convert_newlines, escape_html, strip_newlines
+
+from .utils import strip_newlines
 
 NEWLINE_STR = '\n'
-NEWLINE_HTML = '<br />'
+
 
 class BaseText(object):
     def __init__(self, text):
         self.text = text
 
-    def render(self, escape=True):
-        text = self._render()
-
-        if escape:
-            text = escape_html(text)
-
-        return text
+    def render(self):
+        return self._render()
 
     def __eq__(self, other):
         return self.__class__ == other.__class__ and self.text == other.text
@@ -27,7 +23,7 @@ class BaseText(object):
         return self.text
 
     def render_raw(self):
-        return self.render()
+        return self.text
 
 
 class RawText(BaseText):
@@ -38,7 +34,7 @@ class RawText(BaseText):
 
 
 class NewlineText(BaseText):
-
+    DOUBLE_NEWLINE = NEWLINE_STR * 2
     def __init__(self, *args, **kwargs):
         super(NewlineText, self).__init__(*args, **kwargs)
         self.count = 1
@@ -47,11 +43,8 @@ class NewlineText(BaseText):
         self.count += 1
         self.text += text
 
-    def _render(self, escape=True):
-        if self.count == 1:
-            return NEWLINE_STR
-        else:
-            return NEWLINE_STR * 2
+    def _render(self):
+        return NEWLINE_STR if self.count == 1 else self.DOUBLE_NEWLINE
 
 
 class ErrorText(BaseText):
@@ -97,11 +90,6 @@ class BaseTagMeta(type):
 
     @staticmethod
     def validate_tag_cls(tag_cls):
-        # strip_newlines and convert_newlines
-        if tag_cls.strip_newlines and tag_cls.convert_newlines:
-            raise RuntimeError(
-                "Cannot enable strip_newlines and convert_newlines"
-                " on {tag_cls.tag_name}".format(tag_cls=tag_cls))
         pass
         # TODO `close_on_newline` vs `self_closing`
         # TODO `self_closing` vs `allowed_tags`
@@ -212,7 +200,7 @@ class BaseTag(object):
         `self.attrs` - a dictionary of {`attr_name`:`attr_val`}
             (see `attr_defs` above)
 
-           `self.errors` - a list of strings denoting value errors with the tag.
+       `self.errors` - a list of strings denoting value errors with the tag.
             e.g. missing attrs, or attrs which failed to parse.
 
     Instancemethods to be overwritten:
@@ -231,11 +219,7 @@ class BaseTag(object):
 
     trim_whitespace = False
 
-    # These attributes are about the formating of output text
-    #TODO implement convert_newlines, remove_paragraphs
-    strip_newlines = False         # Removes newlines from the body
-    convert_newlines = False       # Converts newlines in the body to <br />
-    convert_paragraphs = False     # Converts newlines to paragraphs
+    strip_newlines = False
 
     def __init__(self, attrs, tree, start_text, end_text):
         """These classes should not be initialized directly
@@ -293,22 +277,7 @@ class BaseTag(object):
     def render_children(self):
         """Return the rendering of child tags/text
         """
-
-        if self.convert_paragraphs:
-            child_text = render_paragraphs(self.tree)
-        else:
-            child_text = ''.join(child.render() for child in self.tree)
-
-        if self.convert_newlines:
-            child_text = convert_newlines(child_text)
-
-        if self.strip_newlines:
-            child_text = strip_newlines(child_text)
-
-        if self.trim_whitespace:
-            child_text = child_text.strip()
-
-        return child_text
+        return ''.join(child.render() for child in self.tree)
 
     def render(self):
         """Return the rendering of this tag (including children)
@@ -316,14 +285,11 @@ class BaseTag(object):
         """
         text = self._render()
 
-        if self.convert_newlines:
-            text = convert_newlines(text)
+        if self.trim_whitespace:
+            text = text.strip()
 
         if self.strip_newlines:
             text = strip_newlines(text)
-
-        if self.trim_whitespace:
-            text = text.strip()
 
         return text
 
@@ -334,7 +300,7 @@ class BaseTag(object):
         """Return the raw text used to generate this tag,
             and all of its children.
         """
-        return self.start_text + self.render_children_raw()  + self.end_text
+        return self.start_text + self.render_children_raw() + self.end_text
 
     def render_children_raw(self):
         """Return the raw text used to generate this tag's children.
@@ -425,61 +391,3 @@ def parse_tag_set(tag_set):
         seen.add(tag.tag_name)
 
     return tags
-
-
-
-def get_paragraph_insert_index(tree):
-    """Walks through the tree trying to find a place to insert a paragraph
-    """
-
-    length = len(tree) - 1
-    while length >= 0:
-        if tree[length] in ('\n', '<p>', '</p>'):
-            return length + 1
-        length -= 1
-    return 0
-
-
-def render_paragraphs(tree):
-    """Walks through the nodes in the tree trying to work out where the
-       correct location is to insert paragraph tags
-    """
-
-    rendered_children = []
-    inside_paragraph = False
-
-    for node_index, node in enumerate(tree):
-
-        # Raw text
-        if isinstance(node, RawText):
-            if not inside_paragraph:
-                paragraph_index = get_paragraph_insert_index(rendered_children)
-                rendered_children.insert(paragraph_index, '<p>')
-                inside_paragraph = True
-            rendered_children.append(node.render())
-
-        # Newline
-        elif isinstance(node, NewlineText):
-            if node.count == 1:
-                rendered_children.append(node.render())
-            elif node.count == 2:
-                if inside_paragraph:
-                    rendered_children.append('</p>')
-                    inside_paragraph = False
-                else:
-                    rendered_children.append('<p>')
-                    inside_paragraph = True
-
-        # Any tag that can be rendered
-        elif isinstance(node, BaseTag):
-            if not inside_paragraph:
-                rendered_children.append('<p>')
-                inside_paragraph = True
-            rendered_children.append(node.render())
-
-    # If we're still inside a paragraph, close it
-    if inside_paragraph:
-        rendered_children.append('</p>')
-        inside_paragraph = False
-
-    return ''.join(rendered_children)

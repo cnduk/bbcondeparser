@@ -1,6 +1,5 @@
 import sys
 import re
-import cgi
 
 
 if sys.version_info.major == 2:
@@ -21,16 +20,11 @@ else:
         return string_like_object
 
 
-def escape_html(text):
-    return cgi.escape(text, quote=True)
-
-
 _backslash_sub_re = re.compile(r'(\\.)')
 def _replace_backslash_sub(match):
     # our regex will only match 2 characters, a backslash and some character
     # we just want to replace the two characters with whatever the second character is.
     return match.groups()[0][1]
-
 
 def remove_backslash_escapes(text):
     return _backslash_sub_re.sub(_replace_backslash_sub, text)
@@ -57,12 +51,4 @@ def find_next_multi_char(search_string, chars, start=0):
 def strip_newlines(text, newline_char='\n'):
     """Removes any newline characters from the text
     """
-
     return text.replace(newline_char, '')
-
-
-def convert_newlines(text, newline_char='\n', convert_char='<br />'):
-    """Converts the new line character into the convert character
-    """
-
-    return text.replace(newline_char, convert_char)

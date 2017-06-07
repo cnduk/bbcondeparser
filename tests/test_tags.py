@@ -119,16 +119,6 @@ class TestAllowedTags(unittest.TestCase):
         )
 
 
-class TestBaseMetaTags(unittest.TestCase):
-    def test_newlin_runtime_error(self):
-
-        with self.assertRaises(RuntimeError):
-            class BadTag(tags.BaseTag):
-                tag_name = 'bad_tag'
-                strip_newlines = True
-                convert_newlines = True
-
-
 class TestNewlineTextCount(unittest.TestCase):
     def test_add_newline(self):
         test_newline = tags.NewlineText(tags.NEWLINE_STR)
@@ -139,16 +129,16 @@ class TestNewlineTextCount(unittest.TestCase):
 class TestNewlineTextRender(unittest.TestCase):
     def test_render_one_line(self):
         test_newline = tags.NewlineText(tags.NEWLINE_STR)
-        self.assertEqual(test_newline.render(False), tags.NEWLINE_STR)
+        self.assertEqual(test_newline.render(), tags.NEWLINE_STR)
 
     def test_render_two_line(self):
         test_newline = tags.NewlineText(tags.NEWLINE_STR)
         test_newline.add_newline(tags.NEWLINE_STR)
-        self.assertEqual(test_newline.render(False), tags.NEWLINE_STR*2)
+        self.assertEqual(test_newline.render(), tags.NEWLINE_STR*2)
 
     def test_render_x_line(self):
         test_newline = tags.NewlineText(tags.NEWLINE_STR)
         test_newline.add_newline(tags.NEWLINE_STR)
         test_newline.add_newline(tags.NEWLINE_STR)
         test_newline.add_newline(tags.NEWLINE_STR)
-        self.assertEqual(test_newline.render(False), tags.NEWLINE_STR*2)
+        self.assertEqual(test_newline.render(), tags.NEWLINE_STR*2)

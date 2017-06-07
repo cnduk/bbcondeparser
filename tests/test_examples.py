@@ -1,7 +1,8 @@
 import unittest
 
 from bbcondeparser import (
-    BaseTag, SimpleTag, ErrorText, BaseTreeParser, TagCategory
+    BaseTag, SimpleTag, ErrorText, TagCategory,
+    BaseHTMLRenderTreeParser, BaseHTMLTag,
 )
 
 ###############################################################################
@@ -150,7 +151,7 @@ class NoParagraphsTag(BaseTag):
         return self.render_children()
 
 
-class ParagraphsTag(BaseTag):
+class ParagraphsTag(BaseHTMLTag):
     tag_name = 'p'
     convert_paragraphs = True
 
@@ -158,7 +159,7 @@ class ParagraphsTag(BaseTag):
         return self.render_children()
 
 
-class ParagraphsTagWithLineBreaks(BaseTag):
+class ParagraphsTagWithLineBreaks(BaseHTMLTag):
     tag_name = 'pp'
     convert_paragraphs = True
     convert_newlines = True
@@ -167,9 +168,16 @@ class ParagraphsTagWithLineBreaks(BaseTag):
         return self.render_children()
 
 
-class Parser(BaseTreeParser):
+class NoNewlines(BaseTag):
+    tag_name = 'oneline'
+    strip_newlines = True
+    def _render(self):
+        return self.render_children()
+
+
+class Parser(BaseHTMLRenderTreeParser):
     tags = [SIMPLE_TAGS, InfoBox, CodeTag, NoParagraphsTag, ParagraphsTag,
-        ParagraphsTagWithLineBreaks]
+        ParagraphsTagWithLineBreaks, NoNewlines]
     ignored_tags = [Image]
 
 
@@ -189,6 +197,7 @@ class BaseTesty(unittest.TestCase):
                 expected_output, result_output, parser.pretty_format()
             )
         )
+
 
 class TestBoldItalic(BaseTesty):
     def test_BI(self):
@@ -287,4 +296,12 @@ class TestTagRenderParagraphsAndNone(BaseTesty):
         self._testy(
             '[p]example 1\n\n[nope]example 2\n\nexample 3\n\n[p]example 5\n\nexample 6[/p][/nope]\n\nexample 4[/p]',
             '<p>example 1</p><p>example 2\n\nexample 3\n\n<p>example 5</p><p>example 6</p></p><p>example 4</p>'
+        )
+
+
+class TestStripNewlines(BaseTesty):
+    def test_strip_newlines(self):
+        self._testy(
+            '[oneline]\n\nHello\r\nWorld\r![/oneline]',
+            'HelloWorld!',
         )

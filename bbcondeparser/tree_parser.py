@@ -176,7 +176,7 @@ class TreeStack(object):
 # S: A                  # stack still holds A
 # T: error(B), error(C) # C was no longer valid under A, so its error container
 #                       # has been added to the tree
-#              v           # not pointing at the EOF
+#              v           # EOF
 # [A][B][C][/A]            #
 # S:                       # stack is empty. A was popped off and was given
 # T: A(error(B), error(C)) # the tree from the last step
