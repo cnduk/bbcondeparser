@@ -5,9 +5,8 @@ cd $(dirname $0)
 PYVER=$(python -c 'import sys; print(sys.version_info.major)')
 
 if [ $PYVER -eq 2 ]; then other_py=python3
-elif [ $PYVER -eq 2]; then other_py=python2
+elif [ $PYVER -eq 3 ]; then other_py=python2
 fi
-
 
 # Run default python version.
 python ./setup.py nosetests
@@ -20,7 +19,7 @@ then
 fi
 
 
-if [ -z "PYVER" ];
+if [ -z "other_py" ];
 then
     echo "what python version are you running '$PYVER'?!";
     echo "Couldn't test another version.";
