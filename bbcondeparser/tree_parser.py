@@ -323,13 +323,13 @@ class _TreeParser(object):
                     tag_tree = self.tree
                     self.set_state(closed_items.pop())
 
-                    # Can only allocate a piece of source text to one tag,
-                    # so give this newline to the outermost/leftmost tag.
-                    end_text = '' if closed_items else close_token.text
                     self.append_tree(self.tag_cls(
                         self.token.attrs, tag_tree,
-                        self.token.text, end_text,
+                        self.token.text, '',
                     ))
+
+                # And now add our newline at the end.
+                self.append_tree(self.newline_text_class(close_token.text))
 
     def handle_eof(self):
         if self.stack:

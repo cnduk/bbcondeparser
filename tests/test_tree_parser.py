@@ -102,8 +102,31 @@ class TestParseTree(unittest.TestCase):
                 (),
                 [RawText('A tag like this should turn the text yellow!')],
                 '[banana]',
-                '\n',
-            )
+                '',
+            ),
+            NewlineText('\n'),
+        ]
+
+        result = tree_parser.parse_tree(input_text, tags)
+
+        self.assertEqual(expected_tree, result)
+
+    def test_multi_newline_closed_tag(self):
+        class Tag1(MockBaseTag):
+            close_on_newline = True
+            tag_name = 'orange'
+
+        tags = [Tag1]
+        input_text = '[orange]This tag should make the text tangy!\n\n'
+
+        expected_tree = [
+            Tag1(
+                (),
+                [RawText('This tag should make the text tangy!')],
+                '[orange]',
+                '',
+            ),
+            NewlineText('\n\n'),
         ]
 
         result = tree_parser.parse_tree(input_text, tags)
@@ -258,7 +281,8 @@ class TestParseTree(unittest.TestCase):
         tags = [Tag1, Tag2]
 
         expected_tree = [
-            Tag1((), [ErrorText('[b]')], '[a]', '\n'),
+            Tag1((), [ErrorText('[b]')], '[a]', ''),
+            NewlineText('\n'),
             ErrorText('[/b]'),
         ]
 
@@ -279,7 +303,8 @@ class TestParseTree(unittest.TestCase):
                 Tag1((), [
                     Tag1((), [RawText("text")], '[a]', ''),
                 ], '[a]', ''),
-            ], '[a]', '\n'),
+            ], '[a]', ''),
+            NewlineText('\n'),
             ErrorText("[/a]"),
             ErrorText("[/a]"),
         ]
@@ -417,8 +442,9 @@ class TestParseTree(unittest.TestCase):
                     ErrorText("[B]"),
                     ErrorText("[C]"),
                 ],
-                '[A]', '\n',
+                '[A]', '',
             ),
+            NewlineText('\n'),
         ]
 
         result = tree_parser.parse_tree(input_text, tags)
