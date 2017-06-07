@@ -1,5 +1,4 @@
 from collections import namedtuple
-from operator import attrgetter
 
 import six
 
@@ -61,47 +60,49 @@ class TreeStack(object):
     def __len__(self):
         return len(self.stack)
 
-    def __getitem__(self, index):
-        return self.stack(index)
-
-    @property
-    def head(self):
-        return self.stack[-1]
-
     def pop(self):
         return self.stack.pop()
+
+    def behead(self, index):
+        """Reset the stack back to index and return the items
+            removed from the top of the stack.
+        e.g.
+            stack = A, B, C, D, E, F, G
+            index = 3
+        results in:
+            stack = A, B, C # stack[:index]
+            returned = D, E, F, G # stack[index:]
+        """
+        self.stack[::], items = self.stack[:index], self.stack[index:]
+        return items
 
     def push(self, *args, **kwargs):
         item = StackLevel(*args, **kwargs)
         self.stack.append(item)
 
-    def contains_open_for(self, token):
+    def open_for_index(self, token):
         assert isinstance(token, CloseTagToken)
-        return any(
-            stack_level.tag_cls.tag_name == token.tag_name
-            for stack_level in self.stack
+        return self.find_last(
+            lambda x: x.tag_cls.tag_name == token.tag_name
         )
 
-    def want_close_on_newline(self):
-        return any(
-            stack_level.tag_cls.close_on_newline
-            for stack_level in self.stack
+    def first_newline_close_index(self):
+        return self.find_first(
+            lambda x: x.tag_cls.close_on_newline
         )
 
     def reset(self, index):
         """Clear the stack back to a certain point, and return the last
             item cleared form the stack
             e.g.
-            stack = A, B, C, D, E, F, G
-            index = 3
+                stack = A, B, C, D, E, F, G
+                index = 3
             results in:
-            stack = A, B, C
-            returned = D (index #3)
-            forgotten = E, F, G
+                stack = A, B, C # stack[:index]
+                returned = D (index #3)
+                forgotten = E, F, G
         """
-        item = self.stack[index]
-        self.stack = self.stack[:index]
-        return item
+        return self.behead(index)[0]
 
     def find_first(self, filter, min=0):
         """return the lowest item in the stack meets `filter`,
@@ -150,7 +151,19 @@ class TreeStack(object):
         return -1
 
 
-# This function is relatively straight forward, apart from what it does
+def parse_tree(
+    raw_text, tags, raw_text_class=RawText, error_text_class=ErrorText,
+    newline_text_class=NewlineText,
+):
+    """`raw_text` is the raw bb code (conde format) to be parsed
+        `tags` should be an iterable of tag classes allowed in the text
+    """
+    inst = _TreeParser(raw_text, tags, raw_text_class,
+            error_text_class, newline_text_class)
+    inst.parse_tree()
+    return inst.tree
+
+# This class is relatively straight forward, apart from what it does
 # when it encounters an error and has to re-evaluate tokens it's already
 # parsed. consider the following setup
 #  A(B)  - tag A accepts only B tags
@@ -182,134 +195,175 @@ class TreeStack(object):
 # T: A(error(B), error(C)) # the tree from the last step
 # This is done differently for newline closing, tag closing ([/tagname]),
 # and encountering the end of the file.
-def parse_tree(
-    raw_text, tags, raw_text_class=RawText, error_text_class=ErrorText,
-    newline_text_class=NewlineText,
-):
-    """`raw_text` is the raw bb code (conde format) to be parsed
-        `tags` should be an iterable of tag classes allowed in the text
-    """
-    tokens = get_tokens(raw_text)
-    tag_dict = create_tag_dict(tags)
 
-    stack = TreeStack()
-    tree = []
+class _TreeParser(object):
+    def __init__(self, raw_text, tags, raw_text_class=RawText,
+        error_text_class=ErrorText, newline_text_class=NewlineText
+    ):
+        self.raw_text_class = raw_text_class
+        self.error_text_class = error_text_class
+        self.newline_text_class = newline_text_class
 
-    token_index = 0
-    while token_index <= len(tokens):
-        try:
-            token = tokens[token_index]
-        except IndexError:
-            token = None
+        self.tokens = get_tokens(raw_text)
+        self.tag_dict = create_tag_dict(tags)
 
-        if isinstance(token, TextToken):
-            tree.append(raw_text_class(token.text))
+        self.stack = TreeStack()
+        self.tree = None
 
-        elif isinstance(token, BadSyntaxToken):
-            tree.append(error_text_class(token.text, token.reason))
+        self.token_index = 0
 
-        elif isinstance(token, OpenTagToken):
-            tag_cls = tag_dict.get(token.tag_name)
+    @property
+    def tag_cls(self):
+        return self.tag_dict.get(self.token.tag_name)
 
-            if tag_cls is None:
-                tree.append(error_text_class(token.text, "unknown tag"))
+    def parse_tree(self):
+        self.tree = []
+        while self.token_index <= len(self.tokens):
+            try:
+                self.token = self.tokens[self.token_index]
+            except IndexError:
+                self.token = None
 
-            elif tag_cls.self_closing:
-                # "[]" because self-closing tags contain no tree.
-                tree.append(tag_cls(token.attrs, [], token.text, ""))
+            if isinstance(self.token, TextToken):
+                self.append_tree(self.raw_text_class(self.token.text))
+
+            elif isinstance(self.token, BadSyntaxToken):
+                self.append_err(self.token.reason)
+
+            elif isinstance(self.token, OpenTagToken):
+                self.handle_open_token()
+
+            elif isinstance(self.token, CloseTagToken):
+                self.handle_close_token()
+
+            elif isinstance(self.token, NewlineToken):
+                self.handle_newline_token()
+
+            elif self.token is None:
+                # This might cause us to backtrack, which is why it's
+                # not just a call outside the while.
+                self.handle_eof()
 
             else:
-                # It's an open tag, so push onto the stack
-                stack.push(tree, tag_dict, tag_cls, token, token_index)
-                tree = []
-                tag_dict = get_new_tag_dict(tag_cls, tag_dict)
+                raise TypeError("Uknown token type: {}".format(
+                        type(self.token)))
 
-        elif isinstance(token, CloseTagToken):
-            open_for_index = stack.find_last(
-                lambda x: x.tag_cls.tag_name == token.tag_name
-            )
+            self.token_index += 1
 
-            if open_for_index == -1:
-                tree.append(error_text_class(
-                    token.text, "Close tag does not match any open tag"
+    def handle_open_token(self):
+        if self.tag_cls is None:
+            self.append_err('unknown tag')
+
+        elif self.tag_cls.self_closing:
+            # [] because self-closing tags contain no tree
+            # "" beacuse self-closing tags don't have any end text
+            self.append_tree(self.tag_cls(
+                    self.token.attrs, [], self.token.text, ""))
+
+        else:
+            # It's an open tag, so push onto the stack
+            self.stack_push()
+
+    def handle_close_token(self):
+        open_for_index = self.stack.open_for_index(self.token)
+
+        if open_for_index == -1:
+            self.append_err("close tag does not match any open tag")
+
+        else:
+            # if the open for is not the last thing on the stack, then
+            # we've short circuited the other things on the stack.
+            # we'll need to start again from the first (now bad) tag.
+            # (which sits at open_for_index +1)
+            if open_for_index < len(self.stack) -1:
+                self.stack_reset(open_for_index + 1, reset=True)
+                self.append_err("open tag short-circuited by "
+                        "differing close tag")
+
+            else:
+                tag_tree = self.tree
+                close_token = self.token
+                self.stack_pop()
+                self.append_tree(self.tag_cls(
+                    self.token.attrs, tag_tree,
+                    self.token.text, close_token.text,
                 ))
 
+    def handle_newline_token(self):
+        first_newline_close = self.stack.first_newline_close_index()
+
+        if first_newline_close == -1:
+            if self.tree and isinstance(self.tree[-1], self.newline_text_class):
+                self.tree[-1].add_newline(self.token.text)
             else:
-                # if the open for is not the last thing on the stack, then
-                # we've short circuited the other things on the stack.
-                # we'll need to start again from the first (now bad) tag.
-                # (which sits at open_for_index + 1)
-                if open_for_index < len(stack) -1:
-                    tree, tag_dict, tag_cls, open_token, token_index = \
-                            stack.reset(open_for_index + 1)
-                    tree.append(error_text_class(
-                        open_token.text,
-                        "Open tag short-circuited by differing close tag",
+                self.append_tree(self.newline_text_class(self.token.text))
+
+        else:
+            first_non_newline_close = self.stack.find_first(
+                lambda x: not x.tag_cls.close_on_newline,
+                min=first_newline_close,
+            )
+
+            if first_non_newline_close != -1:
+                # There's an item which doesn't want to be closed by a newline
+                # after the first item which does want to be closed by a
+                # newline. this newline has therefore short-circuited the tag
+                # at this index. So we need to go back and re-evaluate the
+                # tokens from that location.
+                self.stack_reset(first_non_newline_close, reset=True)
+                self.append_err("Open tag short-circuited by "
+                        "newline closed outer tag")
+            else:
+                # everything from the first close_on_newline tag on the stack
+                # to the last is a close_on_newline. So lets close them.
+                closed_items = self.stack.behead(first_newline_close)
+
+                close_token = self.token
+                while closed_items:
+                    tag_tree = self.tree
+                    self.set_state(closed_items.pop())
+
+                    # Can only allocate a piece of source text to one tag,
+                    # so give this newline to the outermost/leftmost tag.
+                    end_text = '' if closed_items else close_token.text
+                    self.append_tree(self.tag_cls(
+                        self.token.attrs, tag_tree,
+                        self.token.text, end_text,
                     ))
 
-                else:
-                    tag_tree = tree
-                    tree, tag_dict, tag_cls, open_token, old_token_index = \
-                            stack.pop()
-
-                    tree.append(tag_cls(open_token.attrs, tag_tree,
-                            open_token.text, token.text))
-
-        elif isinstance(token, NewlineToken):
-            if not stack.want_close_on_newline():
-                if tree and isinstance(tree[-1], newline_text_class):
-                    tree[-1].add_newline(token.text)
-                else:
-                    tree.append(newline_text_class(token.text))
-
-            else:
-                first_newline_close = stack.find_first(
-                    lambda x: x.tag_cls.close_on_newline
-                )
-
-                first_non_newline_close = stack.find_first(
-                    lambda x: not x.tag_cls.close_on_newline,
-                    min=first_newline_close,
-                )
-
-                if first_non_newline_close != -1:
-                    # Theres an item which doesn't want to be closed by a
-                    # newline after the first item which does want to be
-                    # closed by a newline. this newline has therefore
-                    # short-circuited the tag at this index. So we need
-                    # to go back and re-evaluate the tokens from that
-                    # location.
-                    tree, tag_dict, tag_cls, open_token, token_index = \
-                            stack.reset(first_non_newline_close)
-                    tree.append(error_text_class(
-                        open_token.text,
-                        "Open tag short-circuited by newline closed outer tag",
-                    ))
-
-                else:
-                    # Everything from the first "want close on newline" to
-                    # the last want to close on newline, so lets close them.
-                    while stack.want_close_on_newline():
-                        tag_tree = tree
-                        tree, tag_dict, tag_cls, open_token, old_token_index = stack.pop()
-
-                        if stack.want_close_on_newline():
-                            end_text = ''
-                        else:
-                            end_text = token.text
-
-                        tree.append(tag_cls(open_token.attrs, tag_tree,
-                                open_token.text, end_text))
-
-        elif token is None and stack:
+    def handle_eof(self):
+        if self.stack:
             # The first unclosed token has not been closed, so we have to
             # go back and start again.
-            tree, tag_dict, tag_cls, open_token, token_index = stack.reset(0)
-            tree.append(error_text_class(open_token.text, "Missing close tag"))
+            self.stack_reset(0, reset=True)
+            self.append_err("missing close tag")
 
-        token_index += 1
+    def stack_push(self):
+        self.stack.push(self.tree, self.tag_dict, self.tag_cls,
+                self.token, self.token_index)
+        self.tree = []
+        self.tag_dict = get_new_tag_dict(self.tag_cls, self.tag_dict)
 
-    return tree
+    def stack_reset(self, index, reset=False):
+        self.set_state(self.stack.reset(index), reset)
+
+    def stack_pop(self, reset=False):
+        self.set_state(self.stack.pop(), reset)
+
+    def set_state(self, stack_ctx, reset=False):
+        self.tree = stack_ctx.tree
+        self.tag_dict = stack_ctx.tag_dict
+        self.token = stack_ctx.tag_open_token
+
+        if reset:
+            self.token_index = stack_ctx.token_index
+
+    def append_err(self, reason):
+        self.append_tree(self.error_text_class(self.token.text, reason))
+
+    def append_tree(self, item):
+        self.tree.append(item)
+
 
 def create_tag_dict(tags):
     # parse_tag_set will raise a RuntimeError

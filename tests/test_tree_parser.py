@@ -285,7 +285,6 @@ class TestParseTree(unittest.TestCase):
         ]
 
         result = tree_parser.parse_tree(input_text, tags)
-
         self.assertEqual(expected_tree, result)
 
     def test_custom_tag_set_complex(self):
@@ -580,3 +579,10 @@ class TestTreeParserNewline(unittest.TestCase):
         result = tree_parser.parse_tree(input_text, [])
 
         self.assertEqual(expected_tree, result)
+
+class TestBadToken(unittest.TestCase):
+    def test_error_raised_unknown_token_type(self):
+        inst = tree_parser._TreeParser('', [])
+        inst.tokens = [object()]
+        with self.assertRaises(TypeError):
+            inst.parse_tree()
