@@ -71,11 +71,20 @@ class OpenTagToken(BaseToken):
         self.tag_name = tag_name
         self.attrs = attrs
 
+    def __eq__(self, other):
+        return super(OpenTagToken, self).__eq__(other) \
+            and self.tag_name == other.tag_name \
+            and self.attrs == other.attrs
+
 
 class CloseTagToken(BaseToken):
     def __init__(self, text, location, tag_name):
         super(CloseTagToken, self).__init__(text, location)
         self.tag_name = tag_name
+
+    def __eq__(self, other):
+        return super(CloseTagToken, self).__eq__(other) \
+            and self.tag_name == other.tag_name
 
 
 class TokenParser(object):

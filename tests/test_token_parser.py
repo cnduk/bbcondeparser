@@ -1,7 +1,6 @@
 from __future__ import print_function
 
 import unittest
-import mock
 
 from bbcondeparser import token_parser
 
@@ -154,29 +153,6 @@ class TestBaseToken(unittest.TestCase):
 
 class TestTokenParser(unittest.TestCase):
     maxDiff = None
-
-    def setUp(self):
-        # 'cause we also want to compare the attrs
-        # (but in the normal running, we don't, which is why the
-        # code doesn't include the attrs in the comparison)
-        class mock_OpenTagToken(token_parser.OpenTagToken):
-            def __init__(self, text, location, tag_name, attrs):
-                # have to overwrite this, because otherwise the way we're
-                # patching messes things up, brah.
-                token_parser.BaseToken.__init__(self, text, location)
-                self.tag_name = tag_name
-                self.attrs = attrs
-
-            def __eq__(self, other):
-                return super(mock_OpenTagToken, self).__eq__(other) \
-                    and self.attrs == other.attrs
-
-        patch = mock.patch(
-            'bbcondeparser.token_parser.OpenTagToken',
-            new=mock_OpenTagToken
-        )
-        patch.start()
-        self.addCleanup(patch.stop)
 
     def _testy(self, input_str, expected_tokens):
         actual_tokens = token_parser.get_tokens(input_str)
