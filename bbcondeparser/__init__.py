@@ -8,5 +8,6 @@ __version__ = '0.0.3'
 
 __all__ = [
     'BaseTag', 'RawText', 'ErrorText', 'SimpleTag', 'TagCategory',
-    'BaseTreeParser', '__version__',
+    'BaseTreeParser', 'HTMLText', 'BaseHTMLTag', 'BaseHTMLRenderTreeParser',
+    '__version__',
 ]
