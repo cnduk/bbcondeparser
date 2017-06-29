@@ -220,7 +220,7 @@ _tag_name_re_str = '[\w-]+'
 _attr_re_str = r'([a-zA-Z-]+)="((?:[^\\"]|\\.)*)"'
 _attrs_re_str = r'^(?:\s*{_attr_re_str}\s*)*$'.format(**locals())
 
-_close_tag_re = re.compile('^/{_tag_name_re_str}\s*$'.format(**locals()))
+_close_tag_re = re.compile('^/({_tag_name_re_str})\s*$'.format(**locals()))
 _start_tag_name_re = re.compile('^{_tag_name_re_str}$'.format(**locals()))
 
 _attr_re = re.compile(_attr_re_str)
@@ -275,8 +275,9 @@ def parse_tag(text):
         return None
 
     if text[0] == '/': # It's a close tag e.g. [/foo]
-        if _close_tag_re.match(text):
-            return ('close_tag', text[1:], None)
+        match = _close_tag_re.match(text)
+        if match:
+            return ('close_tag', match.groups()[0], None)
         else:
             return None
 
@@ -290,9 +291,9 @@ def parse_tag(text):
     if not (_start_tag_name_re.match(tag_name) and _attrs_re.match(attrs_str)):
         return None
 
-    attr_vals = list(
+    attr_vals = tuple(
         (attr_name, remove_backslash_escapes(attr_val))
         for attr_name, attr_val in _attr_re.findall(attrs_str)
     )
 
-    return ('open_tag', tag_name, tuple(attr_vals))
+    return ('open_tag', tag_name, attr_vals)

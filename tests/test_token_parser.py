@@ -142,6 +142,22 @@ class TestParseTag(unittest.TestCase):
 
         self.assertEqual(expected, result)
 
+    def test_open_tag_name_has_some_spaces(self):
+        input_str = '[a      ]'
+        expected = 'open_tag', 'a', ()
+
+        result = token_parser.parse_tag(input_str)
+
+        self.assertEqual(expected, result)
+
+    def test_close_tag_name_has_some_spaces(self):
+        input_str = '[/a      ]'
+        expected = 'close_tag', 'a', None
+
+        result = token_parser.parse_tag(input_str)
+
+        self.assertEqual(expected, result)
+
 
 class TestBaseToken(unittest.TestCase):
     def test_repr(self):
