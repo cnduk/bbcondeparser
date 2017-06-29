@@ -1,7 +1,9 @@
 import re
+from collections import Mapping
 
 from bbcondeparser.utils import (
-    to_unicode, remove_backslash_escapes, find_next_multi_char
+    to_unicode, remove_backslash_escapes, find_next_multi_char,
+    add_backslash_escapes,
 )
 
 OPEN_CHAR = u'['
@@ -75,6 +77,46 @@ class OpenTagToken(BaseToken):
         return super(OpenTagToken, self).__eq__(other) \
             and self.tag_name == other.tag_name \
             and self.attrs == other.attrs
+
+    @classmethod
+    def generate_token(cls, start_location, tag_name, attrs):
+        """ Tool to generate text for an open tag based on its attributes.
+            This will return an instance with `text` populated with
+            the appropriate string.
+
+            args:
+                `location` - the index of the first character where this tag
+                    will be inserted.
+                `tag_name` - string for the tag name. e.g. if you want
+                    '[img src="https://example.com/image.png"]'
+                    `tag_name` = 'img'
+                `attrs` - an iterable of two-tuple (or other unpackable things
+                    of length 2). This function handles escaping.
+                    will also accept a dict, (will order attrs)
+        """
+        tag_name = to_unicode(tag_name)
+
+        if not attrs:
+            attr_text = ''
+
+        else:
+            if isinstance(attrs, (dict, Mapping)):
+                attrs = sorted(attrs.items())
+
+            attrs = tuple((
+                (to_unicode(str(name)), to_unicode(str(val)))
+                for name, val in attrs
+            ))
+
+            # need to put a space between the name and the attrs
+            attr_text = ' ' + ' '.join(
+                '{}="{}"'.format(k, add_backslash_escapes(v))
+                for k, v in attrs
+            )
+
+        text = '[' + tag_name + attr_text + ']'
+        location = (start_location, start_location+len(text))
+        return cls(text, location, tag_name, attrs)
 
 
 class CloseTagToken(BaseToken):

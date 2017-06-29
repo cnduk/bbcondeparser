@@ -30,6 +30,16 @@ def remove_backslash_escapes(text):
     return _backslash_sub_re.sub(_replace_backslash_sub, text)
 
 
+_backslash_add_re = re.compile(r'([\\"])')
+def _add_backslash_sub(match):
+    # Our regex matches single characters which need escaping,
+    # so just return the character with a preceeding \
+    return '\\' + match.groups()[0]
+
+def add_backslash_escapes(text):
+    return _backslash_add_re.sub(_add_backslash_sub, text)
+
+
 def find_next_multi_char(search_string, chars, start=0):
     # So I thought this would be inefficient, and tried to improve it.
     # I did some benchmarking and for small numbers of `chars` (which we'll

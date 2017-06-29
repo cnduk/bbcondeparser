@@ -167,6 +167,55 @@ class TestBaseToken(unittest.TestCase):
         repr(token)
 
 
+class TestOpenTagTokenCreation(unittest.TestCase):
+    _cls = token_parser.OpenTagToken
+
+    def test_simple_open_tag(self):
+        expected = self._cls('[bold]', (0, 6), 'bold', ())
+        result = self._cls.generate_token(0, 'bold', ())
+        self.assertEqual(expected, result)
+
+    def test_simple_attr(self):
+        expected = self._cls(
+            '[colorize color="#ffaa00"]', (4, 30),
+            'colorize', (('color', '#ffaa00'),),
+        )
+        result = self._cls.generate_token(
+            4, 'colorize', {'color': '#ffaa00'},
+        )
+        self.assertEqual(expected, result)
+
+    def test_dict_attrs_sorted(self):
+        expected = self._cls(
+            '[something a="a" b="b" c="c"]', (0, 29),
+            'something', (('a', 'a'), ('b', 'b'), ('c', 'c')),
+        )
+        result = self._cls.generate_token(
+            0, 'something', {'a':'a', 'b':'b', 'c':'c'},
+        )
+        self.assertEqual(expected, result)
+
+    def test_multi_attr(self):
+        expected = self._cls(
+            '[choices a="first" b="second"]', (10, 40),
+            'choices', (('a', 'first'), ('b', 'second')),
+        )
+        result = self._cls.generate_token(
+            10, 'choices', (('a', 'first'), ('b', 'second')),
+        )
+        self.assertEqual(expected, result)
+
+    def test_is_escaped(self):
+        expected = self._cls(
+            r'[thing a="hello\"world!\\"]', (0, 27),
+            'thing', (('a', 'hello"world!\\'),),
+        )
+        result = self._cls.generate_token(
+            0, 'thing', {'a': 'hello"world!\\'},
+        )
+        self.assertEqual(expected, result)
+
+
 class TestTokenParser(unittest.TestCase):
     maxDiff = None
 
