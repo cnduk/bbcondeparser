@@ -73,6 +73,15 @@ class OpenTagToken(BaseToken):
         self.tag_name = tag_name
         self.attrs = attrs
 
+    def __repr__(self):
+        return '{}({}@{}<{}@{}>)'.format(
+            self.__class__.__name__,
+            repr(getattr(self, 'text', '<UNINITIALIZED!!>')),
+            getattr(self, 'location', '<UNINITIALIZED!!>'),
+            getattr(self, 'tag_name', '<UNINITIALIZED!!>'),
+            getattr(self, 'attrs', '<UNINITIALIZED!!>'),
+        )
+
     def __eq__(self, other):
         return super(OpenTagToken, self).__eq__(other) \
             and self.tag_name == other.tag_name \
