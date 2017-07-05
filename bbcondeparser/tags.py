@@ -96,6 +96,7 @@ class BaseTagMeta(type):
 
             null_name = 'Null{}'.format(name)
             null_ctx = dict(ctx)
+            null_ctx.pop('__classcell__', None)
             null_ctx['render'] = render
             new_null_cls = super(BaseTagMeta, cls).__new__(
                     cls, null_name, bases, null_ctx)
