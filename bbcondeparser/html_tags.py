@@ -1,6 +1,6 @@
 import cgi
 
-import six
+from . import _six as six
 
 from .utils import strip_newlines
 from .tags import RawText, BaseTagMeta, BaseTag, NewlineText

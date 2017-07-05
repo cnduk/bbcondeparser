@@ -1,6 +1,6 @@
 from collections import namedtuple
 
-import six
+from . import _six as six
 
 from bbcondeparser.token_parser import (
     get_tokens,
