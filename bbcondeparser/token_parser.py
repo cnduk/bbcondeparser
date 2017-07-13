@@ -288,7 +288,7 @@ class TokenParser(object):
 _whitespace_re = re.compile('\s+')
 
 _tag_name_re_str = '[\w-]+'
-_attr_re_str = r'([a-zA-Z-]+)="((?:[^\\"]|\\.)*)"'
+_attr_re_str = r'([a-zA-Z-]+)=("(?:[^\\"]|\\.)*"|\'(?:[^\\\']|\\.)*\')'
 _attrs_re_str = r'^(?:\s*{_attr_re_str}\s*)*$'.format(**locals())
 
 _close_tag_re = re.compile('^/({_tag_name_re_str})\s*$'.format(**locals()))
@@ -296,6 +296,8 @@ _start_tag_name_re = re.compile('^{_tag_name_re_str}$'.format(**locals()))
 
 _attr_re = re.compile(_attr_re_str)
 _attrs_re = re.compile(_attrs_re_str)
+
+_attrs_strip_re = re.compile("(^\"|\"$|^'|'$)")
 
 _salvage_re = re.compile(
         r'(\[/?(:?{_tag_name_re_str}(\s{_attr_re_str})*)?)'.format(**locals()))
@@ -363,7 +365,7 @@ def parse_tag(text):
         return None
 
     attr_vals = tuple(
-        (attr_name, remove_backslash_escapes(attr_val))
+        (attr_name, remove_backslash_escapes(_attrs_strip_re.sub("", attr_val)))
         for attr_name, attr_val in _attr_re.findall(attrs_str)
     )
 
