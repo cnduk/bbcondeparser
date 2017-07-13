@@ -297,8 +297,6 @@ _start_tag_name_re = re.compile('^{_tag_name_re_str}$'.format(**locals()))
 _attr_re = re.compile(_attr_re_str)
 _attrs_re = re.compile(_attrs_re_str)
 
-_attrs_strip_re = re.compile("(^\"|\"$|^'|'$)")
-
 _salvage_re = re.compile(
         r'(\[/?(:?{_tag_name_re_str}(\s{_attr_re_str})*)?)'.format(**locals()))
 
@@ -365,7 +363,7 @@ def parse_tag(text):
         return None
 
     attr_vals = tuple(
-        (attr_name, remove_backslash_escapes(_attrs_strip_re.sub("", attr_val)))
+        (attr_name, remove_backslash_escapes(attr_val[1:-1]))
         for attr_name, attr_val in _attr_re.findall(attrs_str)
     )
 
