@@ -134,8 +134,33 @@ class TestParseTag(unittest.TestCase):
 
         self.assertEqual(expected, result)
 
-    def test_bad_open_tag_attrs(self):
-        input_str = '[an-open-tag this="good" this="is" not=\'good\']'
+    def test_open_tag_attrs_with_double_and_single(self):
+        input_str = '[an-open-tag this="good" this="is" now=\'ok\']'
+        expected = (
+            ('this', 'good'),
+            ('this', 'is'),
+            ('now', 'ok'),
+        )
+        expected = 'open_tag', 'an-open-tag', expected
+
+        result = token_parser.parse_tag(input_str)
+
+        self.assertEqual(expected, result)
+
+    def test_open_tag_attrs_contain_other_quote(self):
+        input_str = '[an-open-tag double="\'" single=\'"\']'
+        expected = (
+            ('double', '\''),
+            ('single', '"'),
+        )
+        expected = 'open_tag', 'an-open-tag', expected
+
+        result = token_parser.parse_tag(input_str)
+
+        self.assertEqual(expected, result)
+
+    def test_bad_open_tag_attrs_contain_same_quote(self):
+        input_str = '[an-open-tag double=""" single=\'\'\']'
         expected = None
 
         result = token_parser.parse_tag(input_str)
