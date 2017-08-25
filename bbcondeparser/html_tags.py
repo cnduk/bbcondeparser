@@ -67,6 +67,11 @@ class BaseHTMLTagMeta(BaseTagMeta):
                 "Cannot enable strip_newlines and convert_newlines"
                 " on {tag_cls.tag_name}".format(tag_cls=tag_cls))
 
+        if is_inline_tag(tag_cls) and tag_cls.convert_paragraphs:
+            raise RuntimeError(
+                "Cannot enable convert_paragraphs "
+                "on inline tag {tag_cls.tag_name}".format(tag_cls=tag_cls))
+
 
 @six.add_metaclass(BaseHTMLTagMeta)
 class BaseHTMLTag(BaseTag):
