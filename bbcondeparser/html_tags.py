@@ -30,6 +30,23 @@ from .tree_parser import BaseTreeParser
 HTML_NEWLINE = '<br />'
 
 
+def is_inline_tag(tag):
+    return getattr(tag, 'tag_display', None) == 'inline'
+
+
+def is_block_tag(tag):
+    return getattr(tag, 'tag_display', None) == 'block'
+
+
+def escape_html(text):
+    return cgi.escape(text, quote=True)
+
+
+class HTMLNewlineText(NewlineText):
+    def _render(self):
+        return '<br />' * self.count
+
+
 class HTMLText(RawText):
     def render(self, **kwargs):
         text = self._render()
@@ -51,22 +68,28 @@ class BaseHTMLTagMeta(BaseTagMeta):
                 " on {tag_cls.tag_name}".format(tag_cls=tag_cls))
 
 
-
 @six.add_metaclass(BaseHTMLTagMeta)
 class BaseHTMLTag(BaseTag):
-    convert_newlines = False # converts newlines to HTML_NEWLINE
+    tag_display = 'inline'
+    convert_newlines = False  # converts newlines to HTML_NEWLINE
     convert_paragraphs = False
 
-    def render_children(self):
-        if self.convert_paragraphs:
-            child_text = render_paragraphs(self.tree)
-        else:
-            child_text = ''.join(child.render() for child in self.tree)
+    def render_children(self, convert_paragraphs=None):
 
-        # These convert and strip are mutually exclusive,
-        # enfored by the metaclass
-        if self.convert_newlines:
-            child_text = convert_newlines(child_text)
+        # TODO: tidy this
+        if convert_paragraphs is None:
+            convert_paragraphs = self.convert_paragraphs
+        elif convert_paragraphs is False and self.convert_paragraphs is True:
+            convert_paragraphs = False
+        else:
+            convert_paragraphs = self.convert_paragraphs
+
+        if is_block_tag(self):
+            child_text = render_tree(
+                self.tree, self.convert_newlines, convert_paragraphs)
+        else:
+            child_text = render_tree(
+                self.tree, self.convert_newlines, False)
 
         if self.strip_newlines:
             child_text = strip_newlines(child_text)
@@ -76,88 +99,93 @@ class BaseHTMLTag(BaseTag):
 
         return child_text
 
-    def render(self):
-        text = super(BaseHTMLTag, self).render()
 
-        if self.convert_newlines:
-            text = convert_newlines(text)
+class HtmlSimpleTag(BaseHTMLTag):
+    template = None
+    replace_text = '{{ body }}'
 
-        return text
+    def _render(self):
+        if self.template is None:
+            return self.render_children()
+
+        return self.template.replace(
+            self.replace_text, self.render_children()
+        )
 
 
 class BaseHTMLRenderTreeParser(BaseTreeParser):
     raw_text_class = HTMLText
+    newline_text_class = HTMLNewlineText
+    convert_newlines = False
+    convert_paragraphs = False
+
+    def render(self):
+        child_text = render_tree(
+            self.tree, self.convert_newlines, self.convert_paragraphs)
+
+        return child_text
 
 
-
-def escape_html(text):
-    return cgi.escape(text, quote=True)
-
-
-def convert_newlines_to_html(text, newline_char='\n', convert_char='<br />'):
-    """Converts the new line character into the convert character
-    """
-
-    return text.replace(newline_char, convert_char)
-
-def get_paragraph_insert_index(tree):
-    """Walks through the tree trying to find a place to insert a paragraph
-    """
-
-    length = len(tree) - 1
-    while length >= 0:
-        if tree[length] in ('\n', '<p>', '</p>'):
-            return length + 1
-        length -= 1
-    return 0
+def peek_node(tree, node_index):
+    try:
+        return tree[node_index]
+    except IndexError:
+        return False
 
 
-def render_paragraphs(tree):
+def render_tree(tree, convert_newlines=False, convert_paragraphs=False):
     """Walks through the nodes in the tree trying to work out where the
        correct location is to insert paragraph tags
     """
+
+    # TODO: include newline removing
 
     rendered_children = []
     inside_paragraph = False
 
     for node_index, node in enumerate(tree):
 
-        # Raw text
-        if isinstance(node, RawText):
-            if not inside_paragraph:
-                paragraph_index = get_paragraph_insert_index(rendered_children)
-                rendered_children.insert(paragraph_index, '<p>')
-                inside_paragraph = True
-            rendered_children.append(node.render())
-
-        # Newline
-        elif isinstance(node, NewlineText):
-            if node.count == 1:
-                rendered_children.append(node.render())
-            elif node.count == 2:
-                if inside_paragraph:
-                    rendered_children.append('</p>')
-                    inside_paragraph = False
-                else:
-                    rendered_children.append('<p>')
-                    inside_paragraph = True
-
-        # Any tag that can be rendered
-        elif isinstance(node, BaseTag):
-            if not inside_paragraph:
+        if is_inline_tag(node):
+            if convert_paragraphs and not inside_paragraph:
                 rendered_children.append('<p>')
                 inside_paragraph = True
             rendered_children.append(node.render())
 
-    # If we're still inside a paragraph, close it
-    if inside_paragraph:
+        elif is_block_tag(node):
+            if convert_paragraphs and inside_paragraph:
+                rendered_children.append('</p>')
+                inside_paragraph = False
+            rendered_children.extend(node.render())
+
+        elif isinstance(node, HTMLText):
+            if convert_paragraphs and not inside_paragraph:
+                rendered_children.append('<p>')
+                inside_paragraph = True
+            rendered_children.append(node.render())
+
+        elif isinstance(node, NewlineText):
+            if node.count > 1:
+                if convert_paragraphs:
+                    if inside_paragraph:
+                        rendered_children.append('</p>')
+                        inside_paragraph = False
+
+                    next_node = peek_node(tree, node_index + 1)
+                    if next_node and not is_block_tag(next_node):
+                        rendered_children.append('<p>')
+                        inside_paragraph = True
+
+                else:
+                    rendered_children.append(node.render_raw())
+
+            else:
+                if convert_newlines:
+                    rendered_children.append(node.render())
+                else:
+                    rendered_children.append(node.render_raw())
+
+    if convert_paragraphs and inside_paragraph:
         rendered_children.append('</p>')
         inside_paragraph = False
 
     return ''.join(rendered_children)
-
-
-def convert_newlines(text, newline_char='\n', convert_char='<br />'):
-    """Converts the new line character into the convert character
-    """
-    return text.replace(newline_char, convert_char)
