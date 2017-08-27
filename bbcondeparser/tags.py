@@ -408,7 +408,8 @@ def parse_tag_set(tag_set):
     seen = set()
     for tag in tags:
         if tag.tag_name in seen:
-            raise RuntimeError("Duplicate tag names detected")
+            raise RuntimeError(
+                "Duplicate tag names detected: {}".format(tag.tag_name))
         seen.add(tag.tag_name)
 
     return tags
