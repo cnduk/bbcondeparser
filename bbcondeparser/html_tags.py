@@ -112,12 +112,12 @@ class BaseHTMLTagMeta(BaseTagMeta):
         """
         BaseTagMeta.validate_tag_cls(tag_cls)
 
-        if tag_cls.strip_newlines and tag_cls.convert_newlines:
+        if tag_cls.strip_newlines is True and tag_cls.convert_newlines:
             raise RuntimeError(
                 "Cannot enable strip_newlines and convert_newlines"
                 " on {tag_cls.tag_name}".format(tag_cls=tag_cls))
 
-        if is_inline_tag(tag_cls) and tag_cls.convert_paragraphs:
+        if is_inline_tag(tag_cls) and tag_cls.convert_paragraphs is True:
             raise RuntimeError(
                 "Cannot enable convert_paragraphs "
                 "on inline tag {tag_cls.tag_name}".format(tag_cls=tag_cls))
@@ -141,8 +141,9 @@ class BaseHTMLTag(BaseTag):
     """
 
     tag_display = 'inline'
-    convert_newlines = False
-    convert_paragraphs = False
+    convert_newlines = 'inherit'
+    convert_paragraphs = 'inherit'
+    strip_newlines = 'inherit'
 
     def render(self, convert_newlines=False, convert_paragraphs=False,
                strip_newlines=False):
@@ -172,6 +173,7 @@ class BaseHTMLTag(BaseTag):
         Returns:
             str: rendered children
         """
+
         if self.convert_newlines != 'inherit':
             convert_newlines = self.convert_newlines
 
