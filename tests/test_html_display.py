@@ -50,7 +50,7 @@ class ImageTag(BaseHTMLTag):
     }
     tag_categories = [BASIC_TAGS, BLOCK_TAGS, ALL_TAGS]
 
-    def _render(self):
+    def _render(self, **kwargs):
         return '<img src="{}">'.format(self.attrs['src'])
 
 
@@ -65,7 +65,8 @@ class ListTag(BaseHTMLTag):
     tag_categories = [BLOCK_TAGS, ALL_TAGS]
     allowed_tags = [LIST_TAGS]
 
-    def _render(self):
+    def _render(self, convert_newlines=None, convert_paragraphs=None,
+                strip_newlines=None):
 
         tag_type = 'ul'
         if self.attrs['type'] == 'ordered':
@@ -73,7 +74,11 @@ class ListTag(BaseHTMLTag):
 
         return '<{tag_type}>{children}</{tag_type}>'.format(
             tag_type=tag_type,
-            children=self.render_children(),
+            children=self.render_children(
+                convert_newlines=convert_newlines,
+                convert_paragraphs=convert_paragraphs,
+                strip_newlines=strip_newlines,
+            ),
         )
 
 
@@ -84,9 +89,14 @@ class ListItemTag(BaseHTMLTag):
     allowed_tags = [BASIC_TAGS]
     convert_newlines = True
 
-    def _render(self):
+    def _render(self, convert_newlines=None, convert_paragraphs=None,
+                strip_newlines=None):
         return '<li>{children}</li>'.format(
-            children=self.render_children(),
+            children=self.render_children(
+                convert_newlines=convert_newlines,
+                convert_paragraphs=convert_paragraphs,
+                strip_newlines=strip_newlines,
+            ),
         )
 
 
@@ -95,9 +105,14 @@ class BlockquoteTag(BaseHTMLTag):
     tag_display = 'block'
     tag_categories = [BLOCK_TAGS, ALL_TAGS]
 
-    def _render(self):
+    def _render(self, convert_newlines=None, convert_paragraphs=None,
+                strip_newlines=None):
         return '<blockquote>{children}</blockquote>'.format(
-            children=self.render_children(),
+            children=self.render_children(
+                convert_newlines=convert_newlines,
+                convert_paragraphs=convert_paragraphs,
+                strip_newlines=strip_newlines,
+            ),
         )
 
 
@@ -167,7 +182,7 @@ class InfoBoxItem(ChildSearcher):
         else:
             self._val = val_inst.render()
 
-    def _render(self):
+    def _render(self, **kwargs):
         return '<td>{}</td><td>{}</td>'.format(self._key, self._val)
 
 
@@ -176,8 +191,13 @@ class InfoBoxTitle(BaseHTMLTag):
     tag_display = 'block'
     allowed_tags = [INLINE_TAGS]
 
-    def _render(self):
-        return self.render_title(self.render_children())
+    def _render(self, convert_newlines=None, convert_paragraphs=None,
+                strip_newlines=None):
+        return self.render_title(self.render_children(
+            convert_newlines=convert_newlines,
+            convert_paragraphs=convert_paragraphs,
+            strip_newlines=strip_newlines,
+        ))
 
     @staticmethod
     def render_title(content):
@@ -199,13 +219,25 @@ class InfoBox(ChildSearcher):
         self._item_instances = self.find_children_instances(
             InfoBoxItem, multi=True)
 
-    def _render(self):
+    def _render(self, convert_newlines=None, convert_paragraphs=None,
+                strip_newlines=None):
         if self._title_instance is None:
             title = InfoBoxTitle.render_title('<NOTITLE>')  # Probably do something nicer
         else:
-            title = self._title_instance.render()
+            title = self._title_instance.render(
+                convert_newlines=convert_newlines,
+                convert_paragraphs=convert_paragraphs,
+                strip_newlines=strip_newlines,
+            )
 
-        body = ''.join(item.render() for item in self._item_instances)
+        body = ''.join(
+            item.render(
+                convert_newlines=convert_newlines,
+                convert_paragraphs=convert_paragraphs,
+                strip_newlines=strip_newlines,
+            )
+            for item in self._item_instances
+        )
 
         return '<table>{}{}</table>'.format(title, body)
 
@@ -215,7 +247,7 @@ class CodeTag(BaseHTMLTag):
     tag_display = 'block'
     tag_categories = [BLOCK_TAGS, ALL_TAGS]
 
-    def _render(self):
+    def _render(self, **kwargs):
         return '<code><pre>' + self.render_children_raw() + '</code></pre>'
 
 
@@ -226,8 +258,13 @@ class DivTag(BaseHTMLTag):
     convert_newlines = True
     convert_paragraphs = True
 
-    def _render(self):
-        return '<div>{children}</div>'.format(children=self.render_children())
+    def _render(self, convert_newlines=None, convert_paragraphs=None,
+                strip_newlines=None):
+        return '<div>{children}</div>'.format(children=self.render_children(
+            convert_newlines=convert_newlines,
+            convert_paragraphs=convert_paragraphs,
+            strip_newlines=strip_newlines,
+        ))
 
 
 class DefaultParser(BaseHTMLRenderTreeParser):
@@ -361,19 +398,19 @@ class TestDivTag(DefaultParserTesty):
     def test_divtag(self):
         self._testy(
             "example\n\n[div][b]bold[/b] word[/div]\n\nexample",
-            "example\n\n<div><p><strong>bold</strong> word</p></div>\n\nexample",
+            "example\n\n<div><strong>bold</strong> word</div>\n\nexample",
         )
 
     def test_divtag_multi(self):
         self._testy(
             "example\n\n[div][b]bold[/b] word\n\nbutts[/div]\n\nexample",
-            "example\n\n<div><p><strong>bold</strong> word</p><p>butts</p></div>\n\nexample",
+            "example\n\n<div><strong>bold</strong> word\n\nbutts</div>\n\nexample",
         )
 
     def test_divtag_multi_newline(self):
         self._testy(
             "example\n\n[div][b]bold[/b] word\nbutts[/div]\n\nexample",
-            "example\n\n<div><p><strong>bold</strong> word<br />butts</p></div>\n\nexample",
+            "example\n\n<div><strong>bold</strong> word\nbutts</div>\n\nexample",
         )
 
 
