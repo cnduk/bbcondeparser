@@ -79,22 +79,24 @@ class BaseHTMLTag(BaseTag):
     convert_newlines = False  # converts newlines to HTML_NEWLINE
     convert_paragraphs = False
 
-    def render_children(self, convert_paragraphs=None):
+    def render_children(self, convert_newlines=None, convert_paragraphs=None):
 
-        # TODO: tidy this
-        if convert_paragraphs is None:
-            convert_paragraphs = self.convert_paragraphs
-        elif convert_paragraphs is False and self.convert_paragraphs is True:
+        if convert_newlines is False:
+            convert_newlines = False
+        else:
+            convert_newlines = self.convert_newlines
+
+        if convert_paragraphs is False:
             convert_paragraphs = False
         else:
             convert_paragraphs = self.convert_paragraphs
 
         if is_block_tag(self):
             child_text = render_tree(
-                self.tree, self.convert_newlines, convert_paragraphs)
+                self.tree, convert_newlines, convert_paragraphs)
         else:
-            child_text = render_tree(
-                self.tree, self.convert_newlines, False)
+            # Inline tags never render paragraphs
+            child_text = render_tree(self.tree, convert_newlines, False)
 
         if self.strip_newlines:
             child_text = strip_newlines(child_text)
@@ -119,10 +121,49 @@ class HtmlSimpleTag(BaseHTMLTag):
 
 
 class BaseHTMLRenderTreeParser(BaseTreeParser):
+    """
+    I've been intensely thinking about how the paragraphs and newline
+    conversions should work and this is how:
+
+    The parent of the node, whether that be another node or the parser
+    passes down if the values should be converted but only if its False. For
+    instance, if the parser is False for newlines and paragraphs, nowhere
+    should there be converted newlines or paragraphs.
+
+    However if we think of this:
+
+    parser {convert_newlines=True}
+        text
+        infobox {convert_newlines=False}
+            text
+            text
+            infobox2 {convert_newlines=True}
+                text
+                text
+            text
+        text
+
+    should produce
+
+    parser {convert_newlines=True}
+        text
+        <br />
+        infobox {convert_newlines=False}
+            text
+            text
+            infobox2 {convert_newlines=True}
+                text
+                text
+            text
+        <br />
+        text
+
+    """
     raw_text_class = HTMLText
     newline_text_class = HTMLNewlineText
     convert_newlines = False
     convert_paragraphs = False
+    # strip_newlines = False
 
     def render(self):
         child_text = render_tree(
