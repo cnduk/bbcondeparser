@@ -185,13 +185,11 @@ class BaseHTMLTag(BaseTag):
 
         if is_block_tag(self):
             child_text = render_tree(
-                self.tree, convert_newlines, convert_paragraphs,
-                strip_newlines,
-            )
+                self, convert_newlines, convert_paragraphs, strip_newlines)
         else:
             # Inline tags never render paragraphs
             child_text = render_tree(
-                self.tree, convert_newlines, False, strip_newlines)
+                self, convert_newlines, False, strip_newlines)
 
         if self.trim_whitespace:
             child_text = child_text.strip()
@@ -284,7 +282,7 @@ class BaseHTMLRenderTreeParser(BaseTreeParser):
             str: the rendered tag
         """
         child_text = render_tree(
-            self.tree, self.convert_newlines, self.convert_paragraphs,
+            self, self.convert_newlines, self.convert_paragraphs,
             self.strip_newlines,
         )
 
@@ -307,7 +305,7 @@ def peek_node(tree, node_index):
         return False
 
 
-def render_tree(tree, convert_newlines=False, convert_paragraphs=False,
+def render_tree(parent_node, convert_newlines=False, convert_paragraphs=False,
                 strip_newlines=False):
     """Render the tree of tags.
 
@@ -323,6 +321,8 @@ def render_tree(tree, convert_newlines=False, convert_paragraphs=False,
     rendered_children = []
     inside_paragraph = False
 
+    tree = parent_node.tree
+
     for node_index, node in enumerate(tree):
 
         if is_inline_tag(node):
@@ -336,14 +336,19 @@ def render_tree(tree, convert_newlines=False, convert_paragraphs=False,
             ))
 
         elif is_block_tag(node):
-            if convert_paragraphs and inside_paragraph:
-                rendered_children.append('</p>')
-                inside_paragraph = False
-            rendered_children.extend(node.render(
-                convert_newlines=convert_newlines,
-                convert_paragraphs=convert_paragraphs,
-                strip_newlines=strip_newlines,
-            ))
+
+            if is_inline_tag(parent_node):
+                rendered_children.append(node.render_raw())
+
+            else:
+                if convert_paragraphs and inside_paragraph:
+                    rendered_children.append('</p>')
+                    inside_paragraph = False
+                rendered_children.extend(node.render(
+                    convert_newlines=convert_newlines,
+                    convert_paragraphs=convert_paragraphs,
+                    strip_newlines=strip_newlines,
+                ))
 
         elif isinstance(node, HTMLText):
             if convert_paragraphs and not inside_paragraph:
