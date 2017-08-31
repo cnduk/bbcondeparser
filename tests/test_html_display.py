@@ -230,12 +230,6 @@ class DivTag(BaseHTMLTag):
         return '<div>{children}</div>'.format(children=self.render_children())
 
 
-class Parser(BaseHTMLRenderTreeParser):
-    tags = [ALL_TAGS]
-    convert_paragraphs = True
-    # convert_newlines = True
-
-
 class DefaultParser(BaseHTMLRenderTreeParser):
     tags = [
         ALL_TAGS,
