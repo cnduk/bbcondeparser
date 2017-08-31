@@ -271,6 +271,14 @@ class StripNewlinesParser(BaseHTMLRenderTreeParser):
     strip_newlines = True
 
 
+class StripNewlinesNotParagraphsParser(BaseHTMLRenderTreeParser):
+    tags = [
+        ALL_TAGS,
+    ]
+    convert_paragraphs = True
+    strip_newlines = True
+
+
 ###############################################################################
 # Unit test classes doon 'ere!
 ###############################################################################
@@ -306,6 +314,10 @@ class ParagraphNewlinesParserTesty(BaseTesty):
 
 class StripNewlinesParserTesty(BaseTesty):
     parser = StripNewlinesParser
+
+
+class StripNewlinesNotParagraphsParserTesty(BaseTesty):
+    parser = StripNewlinesNotParagraphsParser
 
 
 #
@@ -584,6 +596,63 @@ class TestStripNewlines(StripNewlinesParserTesty):
         self._testy(
             'paragraph[img src="butts"]\nparagraph',
             'paragraph<img src="butts">paragraph',
+        )
+
+
+class TestStripNewlinesNotParagraphs(StripNewlinesNotParagraphsParserTesty):
+
+    def test_single_words(self):
+        self._testy(
+            "some words",
+            "<p>some words</p>",
+        )
+
+    def test_multiple_words(self):
+        self._testy(
+            "some words\n\nspaced between\nparagraphs",
+            "<p>some words</p><p>spaced betweenparagraphs</p>",
+        )
+
+    def test_inline_single(self):
+        self._testy(
+            "[b]Inline[/b]",
+            "<p><strong>Inline</strong></p>",
+        )
+
+    def test_inline_double(self):
+        self._testy(
+            "[b]Inline[/b]\n[i]Inline[/i]",
+            "<p><strong>Inline</strong><em>Inline</em></p>",
+        )
+
+    def test_inline_single_newline(self):
+        self._testy(
+            "[b]Inline[/b]\n[i]Inline[/i]",
+            "<p><strong>Inline</strong><em>Inline</em></p>",
+        )
+
+    def test_block_standalone(self):
+        self._testy(
+            '[img src="butts"]',
+            '<img src="butts">',
+        )
+
+    def test_block_text(self):
+        self._testy(
+            'paragraph\n\n[img src="butts"]\n\nparagraph',
+            '<p>paragraph</p><img src="butts"><p>paragraph</p>',
+        )
+
+    def test_block_text_no_newlines(self):
+        self._testy(
+            'paragraph[img src="butts"]paragraph',
+            '<p>paragraph</p><img src="butts"><p>paragraph</p>',
+        )
+
+    def test_block_text_newline_after_block(self):
+        self._testy(
+            'paragraph[img src="butts"]\nparagraph',
+            '<p>paragraph</p><img src="butts"><p>paragraph</p>',
         )
 
 
