@@ -22,7 +22,6 @@ import cgi
 
 from . import _six as six
 
-from .utils import strip_newlines
 from .tags import RawText, BaseTagMeta, BaseTag, NewlineText
 from .tree_parser import BaseTreeParser
 
@@ -79,7 +78,8 @@ class BaseHTMLTag(BaseTag):
     convert_newlines = False  # converts newlines to HTML_NEWLINE
     convert_paragraphs = False
 
-    def render_children(self, convert_newlines=None, convert_paragraphs=None):
+    def render_children(self, convert_newlines=None, convert_paragraphs=None,
+                        strip_newlines=False):
 
         if convert_newlines is False:
             convert_newlines = False
@@ -91,15 +91,20 @@ class BaseHTMLTag(BaseTag):
         else:
             convert_paragraphs = self.convert_paragraphs
 
+        if strip_newlines is False:
+            strip_newlines = False
+        else:
+            strip_newlines = self.strip_newlines
+
         if is_block_tag(self):
             child_text = render_tree(
-                self.tree, convert_newlines, convert_paragraphs)
+                self.tree, convert_newlines, convert_paragraphs,
+                strip_newlines,
+            )
         else:
             # Inline tags never render paragraphs
-            child_text = render_tree(self.tree, convert_newlines, False)
-
-        if self.strip_newlines:
-            child_text = strip_newlines(child_text)
+            child_text = render_tree(
+                self.tree, convert_newlines, False, strip_newlines)
 
         if self.trim_whitespace:
             child_text = child_text.strip()
@@ -163,11 +168,13 @@ class BaseHTMLRenderTreeParser(BaseTreeParser):
     newline_text_class = HTMLNewlineText
     convert_newlines = False
     convert_paragraphs = False
-    # strip_newlines = False
+    strip_newlines = False
 
     def render(self):
         child_text = render_tree(
-            self.tree, self.convert_newlines, self.convert_paragraphs)
+            self.tree, self.convert_newlines, self.convert_paragraphs,
+            self.strip_newlines,
+        )
 
         return child_text
 
@@ -179,12 +186,11 @@ def peek_node(tree, node_index):
         return False
 
 
-def render_tree(tree, convert_newlines=False, convert_paragraphs=False):
+def render_tree(tree, convert_newlines=False, convert_paragraphs=False,
+                strip_newlines=False):
     """Walks through the nodes in the tree trying to work out where the
        correct location is to insert paragraph tags
     """
-
-    # TODO: include newline removing
 
     rendered_children = []
     inside_paragraph = False
@@ -223,13 +229,15 @@ def render_tree(tree, convert_newlines=False, convert_paragraphs=False):
 
                 elif convert_newlines:
                     rendered_children.append(node.render())
-                else:
+
+                elif not strip_newlines:
                     rendered_children.append(node.render_raw())
 
             else:
                 if convert_newlines:
                     rendered_children.append(node.render())
-                else:
+
+                elif not strip_newlines:
                     rendered_children.append(node.render_raw())
 
     if convert_paragraphs and inside_paragraph:
