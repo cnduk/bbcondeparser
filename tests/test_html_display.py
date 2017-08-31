@@ -219,15 +219,15 @@ class CodeTag(BaseHTMLTag):
         return '<code><pre>' + self.render_children_raw() + '</code></pre>'
 
 
-# class DivTag(BaseHTMLTag):
-#     tag_name = 'div'
-#     tag_display = 'block'
-#     tag_categories = [ALL_TAGS]
-#     convert_newlines = True
-#     convert_paragraphs = True
+class DivTag(BaseHTMLTag):
+    tag_name = 'div'
+    tag_display = 'block'
+    tag_categories = [ALL_TAGS]
+    convert_newlines = True
+    convert_paragraphs = True
 
-#     def _render(self):
-#         return '<div>{children}</div>'.format(children=self.render_children())
+    def _render(self):
+        return '<div>{children}</div>'.format(children=self.render_children())
 
 
 class Parser(BaseHTMLRenderTreeParser):
@@ -351,12 +351,24 @@ class TestCodeTag(DefaultParserTesty):
         )
 
 
-# class TestDivTag(DefaultParserTesty):
-#     def test_divtag(self):
-#         self._testy(
-#             "example\n\n[div][b]bold[/b] word[/div]\n\nexample",
-#             "example\n\n<div><strong>bold</strong> word</div>\n\nexample",
-#         )
+class TestDivTag(DefaultParserTesty):
+    def test_divtag(self):
+        self._testy(
+            "example\n\n[div][b]bold[/b] word[/div]\n\nexample",
+            "example\n\n<div><p><strong>bold</strong> word</p></div>\n\nexample",
+        )
+
+    def test_divtag_multi(self):
+        self._testy(
+            "example\n\n[div][b]bold[/b] word\n\nbutts[/div]\n\nexample",
+            "example\n\n<div><p><strong>bold</strong> word</p><p>butts</p></div>\n\nexample",
+        )
+
+    def test_divtag_multi_newline(self):
+        self._testy(
+            "example\n\n[div][b]bold[/b] word\nbutts[/div]\n\nexample",
+            "example\n\n<div><p><strong>bold</strong> word<br />butts</p></div>\n\nexample",
+        )
 
 
 class TestParagraphs(ParagraphParserTesty):
