@@ -32,6 +32,7 @@ class BoldTag(HtmlSimpleTag):
     template = '<strong>{}</strong>'.format(HtmlSimpleTag.replace_text)
     tag_categories = [INLINE_TAGS, BASIC_TAGS, ALL_TAGS]
     allowed_tags = [INLINE_TAGS]
+    convert_newlines = 'inherit'
 
 
 class ItalicTag(HtmlSimpleTag):
@@ -39,6 +40,7 @@ class ItalicTag(HtmlSimpleTag):
     template = '<em>{}</em>'.format(HtmlSimpleTag.replace_text)
     tag_categories = [INLINE_TAGS, BASIC_TAGS, ALL_TAGS]
     allowed_tags = [INLINE_TAGS]
+    convert_newlines = 'inherit'
 
 
 class ImageTag(BaseHTMLTag):
@@ -255,16 +257,80 @@ class DivTag(BaseHTMLTag):
     tag_name = 'div'
     tag_display = 'block'
     tag_categories = [ALL_TAGS]
-    convert_newlines = True
-    convert_paragraphs = True
+    convert_newlines = 'inherit'
+    convert_paragraphs = 'inherit'
+    strip_newlines = 'inherit'
 
     def _render(self, convert_newlines=False, convert_paragraphs=False,
                 strip_newlines=False):
+
         return '<div>{children}</div>'.format(children=self.render_children(
             convert_newlines=convert_newlines,
             convert_paragraphs=convert_paragraphs,
             strip_newlines=strip_newlines,
         ))
+
+
+class BaseDivTag(BaseHTMLTag):
+    tag_display = 'block'
+    tag_categories = [ALL_TAGS]
+
+    def _render(self, convert_newlines=False, convert_paragraphs=False,
+                strip_newlines=False):
+
+        return '<div>{children}</div>'.format(children=self.render_children(
+            convert_newlines=convert_newlines,
+            convert_paragraphs=convert_paragraphs,
+            strip_newlines=strip_newlines,
+        ))
+
+
+class NewlineTrueTag(BaseDivTag):
+    tag_name = 'newline-true'
+    convert_newlines = True
+
+
+class NewlineFalseTag(BaseDivTag):
+    tag_name = 'newline-false'
+    convert_newlines = False
+
+
+class NewlineInheritTag(BaseDivTag):
+    tag_name = 'newline-inherit'
+    convert_newlines = 'inherit'
+
+
+class ParagraphTrueTag(BaseDivTag):
+    tag_name = 'paragraph-true'
+    convert_paragraphs = True
+
+
+class ParagraphFalseTag(BaseDivTag):
+    tag_name = 'paragraph-false'
+    convert_paragraphs = False
+
+
+class ParagraphInheritTag(BaseDivTag):
+    tag_name = 'paragraph-inherit'
+    convert_paragraphs = 'inherit'
+
+
+class StripNewlinesTrueTag(BaseDivTag):
+    tag_name = 'stripnewlines-true'
+    convert_newlines = False
+    strip_newlines = True
+
+
+class StripNewlinesFalseTag(BaseDivTag):
+    tag_name = 'stripnewlines-false'
+    convert_newlines = False
+    strip_newlines = False
+
+
+class StripNewlinesInheritTag(BaseDivTag):
+    tag_name = 'stripnewlines-inherit'
+    convert_newlines = False
+    strip_newlines = 'inherit'
 
 
 class DefaultParser(BaseHTMLRenderTreeParser):
@@ -314,410 +380,297 @@ class StripNewlinesNotParagraphsParser(BaseHTMLRenderTreeParser):
 # Unit test classes doon 'ere!
 ###############################################################################
 
-class BaseTesty(unittest.TestCase):
-    def _testy(self, input_text, expected_output):
-        parser = self.parser(input_text)
-        result_output = parser.render()
+
+class BaseTest(unittest.TestCase):
+    def _run_tests(self, baseparser, input_text, expected_output):
+        parser = baseparser(input_text)
+        rendered_output = parser.render()
         self.assertEqual(
             expected_output,
-            result_output,
-            "not equal:\n{}\n{}\ntree:\n{}".format(
-                expected_output, result_output, parser.pretty_format()
+            rendered_output,
+            "NOT EQUAL!\nExpected:\n{expected}\n---\nActual:\n{actual}\n---\ntree:\n{tree}".format(
+                expected=expected_output,
+                actual=rendered_output,
+                tree=parser.pretty_format(),
             )
         )
 
 
-class DefaultParserTesty(BaseTesty):
-    parser = DefaultParser
+class InlineTagTests(BaseTest):
 
+    def test_render(self):
+        self._run_tests(
+            DefaultParser,
+            '[b]bold tag[/b]',
+            '<strong>bold tag</strong>',
+        )
 
-class ParagraphParserTesty(BaseTesty):
-    parser = ParagraphParser
+    def test_render_other_inline(self):
+        self._run_tests(
+            DefaultParser,
+            '[b]bold[/b] and [i]italic[/i] tag',
+            '<strong>bold</strong> and <em>italic</em> tag',
+        )
 
-
-class NewlineParserTesty(BaseTesty):
-    parser = NewlineParser
-
-
-class ParagraphNewlinesParserTesty(BaseTesty):
-    parser = ParagraphNewlinesParser
-
-
-class StripNewlinesParserTesty(BaseTesty):
-    parser = StripNewlinesParser
-
-
-class StripNewlinesNotParagraphsParserTesty(BaseTesty):
-    parser = StripNewlinesNotParagraphsParser
-
-
-#
-# Tests
-#
-
-
-class TestBoldItalic(DefaultParserTesty):
-    def test_BI(self):
-        self._testy(
-            "[b][i]Hello, world![/i][/b]",
-            "<strong><em>Hello, world!</em></strong>",
+    def test_dont_render_blocks(self):
+        self._run_tests(
+            DefaultParser,
+            '[b]bold cant render [div]div[/div] tags[/b]',
+            '<strong>bold cant render [div]div[/div] tags</strong>',
         )
 
 
-class TestInfobox(DefaultParserTesty):
-    def test_infobox(self):
-        self._testy(
-            """[infobox]
-                [title]a magical title[/title]
-                [item]
-                    [key]bananas[/key]
-                    [value]yellow[/value]
-                [/item]
-                [item]
-                    [value]red/green[/value]
-                    [key]apples[/key]
-                [/item]
-            [/infobox]""",
-            "<table>"
-                '<td colspan="2">a magical title</td>'
-                "<td>bananas</td><td>yellow</td>"
-                "<td>apples</td><td>red/green</td>"
-            "</table>",
+class BlockTagTests(BaseTest):
+
+    def test_render(self):
+        self._run_tests(
+            DefaultParser,
+            'text outside [div]text inside[/div] text outside',
+            'text outside <div>text inside</div> text outside',
+        )
+
+    def test_render_inline(self):
+        self._run_tests(
+            DefaultParser,
+            'text outside [div][b]text[/b]\n[i]inside[/i][/div] text outside',
+            'text outside <div><strong>text</strong>\n<em>inside</em></div> text outside',
+        )
+
+    def test_render_blocks(self):
+        self._run_tests(
+            DefaultParser,
+            'text outside [div]with another [div]div inside[/div][/div] text outside',
+            'text outside <div>with another <div>div inside</div></div> text outside',
         )
 
 
-class TestCodeTag(DefaultParserTesty):
-    def test_codetag(self):
-        self._testy(
-            "[code][b][i]Hello, world![/i][/b][/code]",
-            "<code><pre>[b][i]Hello, world![/i][/b]</code></pre>",
+class NewlineTests(BaseTest):
+
+    def test_none(self):
+        self._run_tests(
+            NewlineParser,
+            'no newlines in this copy',
+            'no newlines in this copy',
+        )
+
+    def test_single(self):
+        self._run_tests(
+            NewlineParser,
+            'there is one single\nnewline in this copy',
+            'there is one single<br />newline in this copy',
+        )
+
+    def test_double(self):
+        self._run_tests(
+            NewlineParser,
+            'there is two single\n\nnewline in this copy',
+            'there is two single<br /><br />newline in this copy',
+        )
+
+    def test_triple(self):
+        self._run_tests(
+            NewlineParser,
+            'there is three single\n\n\nnewline in this copy',
+            'there is three single<br /><br /><br />newline in this copy',
+        )
+
+    def test_true(self):
+        self._run_tests(
+            NewlineParser,
+            'copy here [newline-true]a newline\nin this copy[/newline-true] copy here',
+            'copy here <div>a newline<br />in this copy</div> copy here',
+        )
+
+    def test_false(self):
+        self._run_tests(
+            NewlineParser,
+            'copy here [newline-false]a newline\nin this copy[/newline-false] copy here',
+            'copy here <div>a newline\nin this copy</div> copy here',
+        )
+
+    def test_inherit(self):
+        self._run_tests(
+            NewlineParser,
+            'copy here [newline-inherit]a newline\nin this copy[/newline-inherit] copy here',
+            'copy here <div>a newline<br />in this copy</div> copy here',
+        )
+
+    def test_inherit_deeper(self):
+        self._run_tests(
+            NewlineParser,
+            'copy here [newline-inherit]newline\n[newline-false][newline-inherit]no\nnewline[/newline-inherit][/newline-false][/newline-inherit] copy here',
+            'copy here <div>newline<br /><div><div>no\nnewline</div></div></div> copy here',
         )
 
 
-class TestDivTag(DefaultParserTesty):
-    def test_divtag(self):
-        self._testy(
-            "example\n\n[div][b]bold[/b] word[/div]\n\nexample",
-            "example\n\n<div><p><strong>bold</strong> word</p></div>\n\nexample",
+class ParagraphTests(BaseTest):
+
+    def test_none(self):
+        self._run_tests(
+            ParagraphParser,
+            '',
+            '',
         )
 
-    def test_divtag_multi(self):
-        self._testy(
-            "example\n\n[div][b]bold[/b] word\n\nbutts[/div]\n\nexample",
-            "example\n\n<div><p><strong>bold</strong> word</p><p>butts</p></div>\n\nexample",
+    def test_single(self):
+        self._run_tests(
+            ParagraphParser,
+            'paragraph around this copy',
+            '<p>paragraph around this copy</p>',
         )
 
-    def test_divtag_multi_newline(self):
-        self._testy(
-            "example\n\n[div][b]bold[/b] word\nbutts[/div]\n\nexample",
-            "example\n\n<div><p><strong>bold</strong> word<br />butts</p></div>\n\nexample",
+    def test_double(self):
+        self._run_tests(
+            ParagraphParser,
+            'there is a paragraph here\n\nthere is a paragraph here',
+            '<p>there is a paragraph here</p><p>there is a paragraph here</p>',
         )
 
-
-class TestParagraphs(ParagraphParserTesty):
-
-    def test_single_words(self):
-        self._testy(
-            "some words",
-            "<p>some words</p>",
+    def test_inline(self):
+        self._run_tests(
+            ParagraphParser,
+            '[b]bold text[/b]\n\n[b]more bold text[/b]',
+            '<p><strong>bold text</strong></p><p><strong>more bold text</strong></p>',
         )
 
-    def test_multiple_words(self):
-        self._testy(
-            "some words\n\nspaced between\n\nparagraphs",
-            "<p>some words</p><p>spaced between</p><p>paragraphs</p>",
+    def test_block(self):
+        self._run_tests(
+            ParagraphParser,
+            '[div]a block is here[/div]some text is here[div]a block is here[/div]some text is here',
+            '<div><p>a block is here</p></div><p>some text is here</p><div><p>a block is here</p></div><p>some text is here</p>',
         )
 
-    def test_inline_single(self):
-        self._testy(
-            "[b]Inline[/b]",
-            "<p><strong>Inline</strong></p>",
+    def test_true(self):
+        self._run_tests(
+            ParagraphParser,
+            'copy here [paragraph-true]wrapped in paragraphs\n\nwrapped in paragraphs[/paragraph-true] copy here',
+            '<p>copy here </p><div><p>wrapped in paragraphs</p><p>wrapped in paragraphs</p></div><p> copy here</p>',
         )
 
-    def test_inline_double(self):
-        self._testy(
-            "[b]Inline[/b]\n\n[i]Inline[/i]",
-            "<p><strong>Inline</strong></p><p><em>Inline</em></p>",
+    def test_false(self):
+        self._run_tests(
+            ParagraphParser,
+            'copy here [paragraph-false]wrapped in paragraphs\n\nwrapped in paragraphs[/paragraph-false] copy here',
+            '<p>copy here </p><div>wrapped in paragraphs\n\nwrapped in paragraphs</div><p> copy here</p>',
         )
 
-    def test_inline_single_newline(self):
-        self._testy(
-            "[b]Inline[/b]\n[i]Inline[/i]",
-            "<p><strong>Inline</strong>\n<em>Inline</em></p>",
+    def test_inherit(self):
+        self._run_tests(
+            ParagraphParser,
+            'copy here [paragraph-inherit]wrapped in paragraphs\n\nwrapped in paragraphs[/paragraph-inherit] copy here',
+            '<p>copy here </p><div><p>wrapped in paragraphs</p><p>wrapped in paragraphs</p></div><p> copy here</p>',
         )
 
-    def test_block_standalone(self):
-        self._testy(
-            '[img src="butts"]',
-            '<img src="butts">',
-        )
-
-    def test_block_text(self):
-        self._testy(
-            'paragraph\n\n[img src="butts"]\n\nparagraph',
-            '<p>paragraph</p><img src="butts"><p>paragraph</p>',
-        )
-
-    def test_block_text_no_newlines(self):
-        self._testy(
-            'paragraph[img src="butts"]paragraph',
-            '<p>paragraph</p><img src="butts"><p>paragraph</p>',
+    def test_inherit_deeper(self):
+        self._run_tests(
+            ParagraphParser,
+            'copy here [paragraph-inherit]wrapped in paragraphs\n\nwrapped in paragraphs[paragraph-false][paragraph-inherit]no paragraphs here[/paragraph-inherit][/paragraph-false][/paragraph-inherit] copy here',
+            '<p>copy here </p><div><p>wrapped in paragraphs</p><p>wrapped in paragraphs</p><div><div>no paragraphs here</div></div></div><p> copy here</p>',
         )
 
 
-class TestNewlines(NewlineParserTesty):
+class StripNewlinesTest(BaseTest):
 
-    def test_single_words(self):
-        self._testy(
-            "some words",
-            "some words",
+    def test_none(self):
+        self._run_tests(
+            StripNewlinesParser,
+            'no newlines here',
+            'no newlines here',
         )
 
-    def test_multiple_words(self):
-        self._testy(
-            "some words\n\nspaced between\nparagraphs",
-            "some words<br /><br />spaced between<br />paragraphs",
+    def test_all(self):
+        self._run_tests(
+            StripNewlinesParser,
+            'remove\n all these\n\n new \n\n\n\nlines',
+            'remove all these new lines',
         )
 
-    def test_inline_single(self):
-        self._testy(
-            "[b]Inline[/b]",
-            "<strong>Inline</strong>",
+    def test_true(self):
+        self._run_tests(
+            StripNewlinesParser,
+            'strip newlines here\n[stripnewlines-true]and also\n\n here[/stripnewlines-true]',
+            'strip newlines here<div>and also here</div>',
         )
 
-    def test_inline_double(self):
-        self._testy(
-            "[b]Inline[/b]\n\n[i]Inline[/i]",
-            "<strong>Inline</strong><br /><br /><em>Inline</em>",
+    def test_false(self):
+        self._run_tests(
+            StripNewlinesParser,
+            'strip newlines here\n[stripnewlines-false]and also\n\n here[/stripnewlines-false]',
+            'strip newlines here<div>and also\n\n here</div>',
         )
 
-    def test_inline_single_newline(self):
-        self._testy(
-            "[b]Inline[/b]\n[i]Inline[/i]",
-            "<strong>Inline</strong><br /><em>Inline</em>",
+    def test_inherit(self):
+        self._run_tests(
+            StripNewlinesParser,
+            'strip newlines here\n[stripnewlines-inherit]and also\n\n here[/stripnewlines-inherit]',
+            'strip newlines here<div>and also here</div>',
         )
 
-    def test_block_standalone(self):
-        self._testy(
-            '[img src="butts"]',
-            '<img src="butts">',
-        )
-
-    def test_block_text(self):
-        self._testy(
-            'paragraph\n\n[img src="butts"]\n\nparagraph',
-            'paragraph<br /><br /><img src="butts"><br /><br />paragraph',
-        )
-
-    def test_block_text_no_newlines(self):
-        self._testy(
-            'paragraph[img src="butts"]paragraph',
-            'paragraph<img src="butts">paragraph',
+    def test_inherit_deep(self):
+        self._run_tests(
+            StripNewlinesParser,
+            'strip newlines here\n[stripnewlines-inherit]and also\n\n here[stripnewlines-false][stripnewlines-inherit]these wont\n\n\n\n go[/stripnewlines-inherit][/stripnewlines-false][/stripnewlines-inherit]',
+            'strip newlines here<div>and also here<div><div>these wont\n\n\n\n go</div></div></div>',
         )
 
 
-class TestParagraphsNewlines(ParagraphNewlinesParserTesty):
+class NewlinesParagraphsTest(BaseTest):
 
-    def test_single_words(self):
-        self._testy(
-            "some words",
-            "<p>some words</p>",
+    def test_words(self):
+        self._run_tests(
+            ParagraphNewlinesParser,
+            'first paragraph\n\nsecond paragraph with newline\nand more content',
+            '<p>first paragraph</p><p>second paragraph with newline<br />and more content</p>',
         )
 
-    def test_multiple_words(self):
-        self._testy(
-            "some words\n\nspaced between\nparagraphs",
-            "<p>some words</p><p>spaced between<br />paragraphs</p>",
+    def test_inline(self):
+        self._run_tests(
+            ParagraphNewlinesParser,
+            'first paragraph\n\nsecond [b]paragraph[/b] with [i]newline\nand more[/i] content',
+            '<p>first paragraph</p><p>second <strong>paragraph</strong> with <em>newline<br />and more</em> content</p>',
         )
 
-    def test_inline_single(self):
-        self._testy(
-            "[b]Inline[/b]",
-            "<p><strong>Inline</strong></p>",
+    def test_block(self):
+        self._run_tests(
+            ParagraphNewlinesParser,
+            '[div]block to start[/div]then some copy[div]and another block\n\nand paragraph[/div]\n\nwith another paragraph',
+            '<div><p>block to start</p></div><p>then some copy</p><div><p>and another block</p><p>and paragraph</p></div><p>with another paragraph</p>',
         )
 
-    def test_inline_double(self):
-        self._testy(
-            "[b]Inline[/b]\n[i]Inline[/i]",
-            "<p><strong>Inline</strong><br /><em>Inline</em></p>",
-        )
-
-    def test_inline_single_newline(self):
-        self._testy(
-            "[b]Inline[/b]\n[i]Inline[/i]",
-            "<p><strong>Inline</strong><br /><em>Inline</em></p>",
-        )
-
-    def test_block_standalone(self):
-        self._testy(
-            '[img src="butts"]',
-            '<img src="butts">',
-        )
-
-    def test_block_text(self):
-        self._testy(
-            'paragraph\n\n[img src="butts"]\n\nparagraph',
-            '<p>paragraph</p><img src="butts"><p>paragraph</p>',
-        )
-
-    def test_block_text_no_newlines(self):
-        self._testy(
-            'paragraph[img src="butts"]paragraph',
-            '<p>paragraph</p><img src="butts"><p>paragraph</p>',
-        )
-
-    def test_block_text_newline_after_block(self):
-        self._testy(
-            'paragraph[img src="butts"]\nparagraph',
-            '<p>paragraph</p><img src="butts"><br /><p>paragraph</p>',
+    def test_inline_block(self):
+        self._run_tests(
+            ParagraphNewlinesParser,
+            '[b]bold text[/b]\nline break[div][i]italic content[/i][/div]',
+            '<p><strong>bold text</strong><br />line break</p><div><p><em>italic content</em></p></div>',
         )
 
 
-class TestStripNewlines(StripNewlinesParserTesty):
+class ParagraphsStripNewlinesTest(BaseTest):
 
-    def test_single_words(self):
-        self._testy(
-            "some words",
-            "some words",
+    def test_words(self):
+        self._run_tests(
+            StripNewlinesNotParagraphsParser,
+            'first paragraph\n\nsecond paragraph with newline\n and more content',
+            '<p>first paragraph</p><p>second paragraph with newline and more content</p>',
         )
 
-    def test_multiple_words(self):
-        self._testy(
-            "some words\n\nspaced between\nparagraphs",
-            "some wordsspaced betweenparagraphs",
+    def test_inline(self):
+        self._run_tests(
+            StripNewlinesNotParagraphsParser,
+            'first paragraph\n\nsecond [b]paragraph[/b] with [i]newline\n and more[/i] content',
+            '<p>first paragraph</p><p>second <strong>paragraph</strong> with <em>newline and more</em> content</p>',
         )
 
-    def test_inline_single(self):
-        self._testy(
-            "[b]Inline[/b]",
-            "<strong>Inline</strong>",
+    def test_block(self):
+        self._run_tests(
+            StripNewlinesNotParagraphsParser,
+            '[div]block to\n start[/div]then some\n copy[div]and another block\n\nand paragraph[/div]\n\nwith another paragraph',
+            '<div><p>block to start</p></div><p>then some copy</p><div><p>and another block</p><p>and paragraph</p></div><p>with another paragraph</p>',
         )
 
-    def test_inline_double(self):
-        self._testy(
-            "[b]Inline[/b]\n[i]Inline[/i]",
-            "<strong>Inline</strong><em>Inline</em>",
+    def test_inline_block(self):
+        self._run_tests(
+            StripNewlinesNotParagraphsParser,
+            '[b]bold text[/b]\nline break[div][i]italic content[/i][/div]',
+            '<p><strong>bold text</strong>line break</p><div><p><em>italic content</em></p></div>',
         )
-
-    def test_inline_single_newline(self):
-        self._testy(
-            "[b]Inline[/b]\n[i]Inline[/i]",
-            "<strong>Inline</strong><em>Inline</em>",
-        )
-
-    def test_block_standalone(self):
-        self._testy(
-            '[img src="butts"]',
-            '<img src="butts">',
-        )
-
-    def test_block_text(self):
-        self._testy(
-            'paragraph\n\n[img src="butts"]\n\nparagraph',
-            'paragraph<img src="butts">paragraph',
-        )
-
-    def test_block_text_no_newlines(self):
-        self._testy(
-            'paragraph[img src="butts"]paragraph',
-            'paragraph<img src="butts">paragraph',
-        )
-
-    def test_block_text_newline_after_block(self):
-        self._testy(
-            'paragraph[img src="butts"]\nparagraph',
-            'paragraph<img src="butts">paragraph',
-        )
-
-
-class TestStripNewlinesNotParagraphs(StripNewlinesNotParagraphsParserTesty):
-
-    def test_single_words(self):
-        self._testy(
-            "some words",
-            "<p>some words</p>",
-        )
-
-    def test_multiple_words(self):
-        self._testy(
-            "some words\n\nspaced between\nparagraphs",
-            "<p>some words</p><p>spaced betweenparagraphs</p>",
-        )
-
-    def test_inline_single(self):
-        self._testy(
-            "[b]Inline[/b]",
-            "<p><strong>Inline</strong></p>",
-        )
-
-    def test_inline_double(self):
-        self._testy(
-            "[b]Inline[/b]\n[i]Inline[/i]",
-            "<p><strong>Inline</strong><em>Inline</em></p>",
-        )
-
-    def test_inline_single_newline(self):
-        self._testy(
-            "[b]Inline[/b]\n[i]Inline[/i]",
-            "<p><strong>Inline</strong><em>Inline</em></p>",
-        )
-
-    def test_block_standalone(self):
-        self._testy(
-            '[img src="butts"]',
-            '<img src="butts">',
-        )
-
-    def test_block_text(self):
-        self._testy(
-            'paragraph\n\n[img src="butts"]\n\nparagraph',
-            '<p>paragraph</p><img src="butts"><p>paragraph</p>',
-        )
-
-    def test_block_text_no_newlines(self):
-        self._testy(
-            'paragraph[img src="butts"]paragraph',
-            '<p>paragraph</p><img src="butts"><p>paragraph</p>',
-        )
-
-    def test_block_text_newline_after_block(self):
-        self._testy(
-            'paragraph[img src="butts"]\nparagraph',
-            '<p>paragraph</p><img src="butts"><p>paragraph</p>',
-        )
-
-
-
-
-
-JUICY_TEST_INPUT = """[b]Lorem ipsum dolor sit amet[/b], consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-
-[img src='#']
-
-[i]Lorem ipsum dolor sit amet[/i], consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-
-[list]
-[item]Item 1[/item]
-[item][b]Item 2[/b][/item]
-[item]Item 3[/item]
-[item][img src='#'][/item]
-[item]Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.[/item]
-[/list]
-
-[blockquote]Example blockquote words[/blockquote]
-
-[b][i]Lorem ipsum dolor sit amet[/i][/b], consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."""
-
-JUICY_TEST_OUTPUT = """<p><strong>Lorem ipsum dolor sit amet</strong>, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p><img src="#"><p><em>Lorem ipsum dolor sit amet</em>, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p><ul>
-<li>Item 1</li>
-<li><strong>Item 2</strong></li>
-<li>Item 3</li>
-<li><img src="#"></li>
-<li>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.<br />Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</li>
-</ul><blockquote>Example blockquote words</blockquote><p><strong><em>Lorem ipsum dolor sit amet</em></strong>, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>"""
-
-
-class TestBigOne(ParagraphParserTesty):
-    def test_big_one(self):
-        self._testy(JUICY_TEST_INPUT, JUICY_TEST_OUTPUT)
