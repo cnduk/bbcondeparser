@@ -133,8 +133,10 @@ class BaseHTMLTag(BaseTag):
     """BaseHTMLTag, used for all HTML tags.
 
     Attributes:
-        convert_newlines (bool): convert newlines to the HTML equivalent
-        convert_paragraphs (bool): convert double newlines to paragraphs
+        convert_newlines (bool, str): convert newlines to the HTML equivalent,
+            can be True, False or 'inherit'
+        convert_paragraphs (bool, str): convert double newlines to paragraphs,
+            can be True, False or 'inherit'
         tag_display (str): tag display mode - block or inline
     """
 
@@ -142,8 +144,8 @@ class BaseHTMLTag(BaseTag):
     convert_newlines = False
     convert_paragraphs = False
 
-    def render(self, convert_newlines=None, convert_paragraphs=None,
-               strip_newlines=None):
+    def render(self, convert_newlines=False, convert_paragraphs=False,
+               strip_newlines=False):
         """Return the rendering of this tag (including children)
             (N.B. This inherintly includes children, no way not to.
         """
@@ -158,8 +160,8 @@ class BaseHTMLTag(BaseTag):
 
         return text
 
-    def render_children(self, convert_newlines=None, convert_paragraphs=None,
-                        strip_newlines=None):
+    def render_children(self, convert_newlines=False, convert_paragraphs=False,
+                        strip_newlines=False):
         """Render the children of the tag.
 
         Args:
@@ -170,19 +172,13 @@ class BaseHTMLTag(BaseTag):
         Returns:
             str: rendered children
         """
-        if convert_newlines is False:
-            convert_newlines = False
-        else:
+        if self.convert_newlines != 'inherit':
             convert_newlines = self.convert_newlines
 
-        if convert_paragraphs is False:
-            convert_paragraphs = False
-        else:
+        if self.convert_paragraphs != 'inherit':
             convert_paragraphs = self.convert_paragraphs
 
-        if strip_newlines is False:
-            strip_newlines = False
-        else:
+        if self.strip_newlines != 'inherit':
             strip_newlines = self.strip_newlines
 
         if is_block_tag(self):
@@ -212,8 +208,8 @@ class HtmlSimpleTag(BaseHTMLTag):
     template = None
     replace_text = '{{ body }}'
 
-    def _render(self, convert_newlines=None, convert_paragraphs=None,
-                strip_newlines=None):
+    def _render(self, convert_newlines=False, convert_paragraphs=False,
+                strip_newlines=False):
 
         rendered_children = self.render_children(
             convert_newlines=convert_newlines,
