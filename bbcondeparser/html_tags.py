@@ -142,6 +142,22 @@ class BaseHTMLTag(BaseTag):
     convert_newlines = False
     convert_paragraphs = False
 
+    def render(self, convert_newlines=None, convert_paragraphs=None,
+               strip_newlines=None):
+        """Return the rendering of this tag (including children)
+            (N.B. This inherintly includes children, no way not to.
+        """
+        text = self._render(
+            convert_newlines=convert_newlines,
+            convert_paragraphs=convert_paragraphs,
+            strip_newlines=strip_newlines,
+        )
+
+        if self.trim_whitespace:
+            text = text.strip()
+
+        return text
+
     def render_children(self, convert_newlines=None, convert_paragraphs=None,
                         strip_newlines=None):
         """Render the children of the tag.
@@ -196,13 +212,20 @@ class HtmlSimpleTag(BaseHTMLTag):
     template = None
     replace_text = '{{ body }}'
 
-    def _render(self):
-        if self.template is None:
-            return self.render_children()
+    def _render(self, convert_newlines=None, convert_paragraphs=None,
+                strip_newlines=None):
 
-        return self.template.replace(
-            self.replace_text, self.render_children()
+        rendered_children = self.render_children(
+            convert_newlines=convert_newlines,
+            convert_paragraphs=convert_paragraphs,
+            strip_newlines=strip_newlines,
         )
+
+        if self.template is None:
+            return rendered_children
+
+        else:
+            return self.template.replace(self.replace_text, rendered_children)
 
 
 class BaseHTMLRenderTreeParser(BaseTreeParser):
@@ -308,13 +331,21 @@ def render_tree(tree, convert_newlines=False, convert_paragraphs=False,
             if convert_paragraphs and not inside_paragraph:
                 rendered_children.append('<p>')
                 inside_paragraph = True
-            rendered_children.append(node.render())
+            rendered_children.append(node.render(
+                convert_newlines=convert_newlines,
+                convert_paragraphs=convert_paragraphs,
+                strip_newlines=strip_newlines,
+            ))
 
         elif is_block_tag(node):
             if convert_paragraphs and inside_paragraph:
                 rendered_children.append('</p>')
                 inside_paragraph = False
-            rendered_children.extend(node.render())
+            rendered_children.extend(node.render(
+                convert_newlines=convert_newlines,
+                convert_paragraphs=convert_paragraphs,
+                strip_newlines=strip_newlines,
+            ))
 
         elif isinstance(node, HTMLText):
             if convert_paragraphs and not inside_paragraph:
