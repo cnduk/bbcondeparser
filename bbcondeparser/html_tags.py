@@ -143,13 +143,13 @@ class BaseHTMLTag(BaseTag):
     convert_paragraphs = False
 
     def render_children(self, convert_newlines=None, convert_paragraphs=None,
-                        strip_newlines=False):
+                        strip_newlines=None):
         """Render the children of the tag.
 
         Args:
             convert_newlines (None, optional): convert newline overwrite
             convert_paragraphs (None, optional): convert paragraph overwrite
-            strip_newlines (bool, optional): strip newline overwrite
+            strip_newlines (None, optional): strip newline overwrite
 
         Returns:
             str: rendered children
