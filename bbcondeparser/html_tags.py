@@ -221,6 +221,8 @@ def render_tree(tree, convert_newlines=False, convert_paragraphs=False):
                         rendered_children.append('<p>')
                         inside_paragraph = True
 
+                elif convert_newlines:
+                    rendered_children.append(node.render())
                 else:
                     rendered_children.append(node.render_raw())
 
