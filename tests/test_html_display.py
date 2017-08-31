@@ -530,6 +530,63 @@ class TestParagraphsNewlines(ParagraphNewlinesParserTesty):
         )
 
 
+class TestStripNewlines(StripNewlinesParserTesty):
+
+    def test_single_words(self):
+        self._testy(
+            "some words",
+            "some words",
+        )
+
+    def test_multiple_words(self):
+        self._testy(
+            "some words\n\nspaced between\nparagraphs",
+            "some wordsspaced betweenparagraphs",
+        )
+
+    def test_inline_single(self):
+        self._testy(
+            "[b]Inline[/b]",
+            "<strong>Inline</strong>",
+        )
+
+    def test_inline_double(self):
+        self._testy(
+            "[b]Inline[/b]\n[i]Inline[/i]",
+            "<strong>Inline</strong><em>Inline</em>",
+        )
+
+    def test_inline_single_newline(self):
+        self._testy(
+            "[b]Inline[/b]\n[i]Inline[/i]",
+            "<strong>Inline</strong><em>Inline</em>",
+        )
+
+    def test_block_standalone(self):
+        self._testy(
+            '[img src="butts"]',
+            '<img src="butts">',
+        )
+
+    def test_block_text(self):
+        self._testy(
+            'paragraph\n\n[img src="butts"]\n\nparagraph',
+            'paragraph<img src="butts">paragraph',
+        )
+
+    def test_block_text_no_newlines(self):
+        self._testy(
+            'paragraph[img src="butts"]paragraph',
+            'paragraph<img src="butts">paragraph',
+        )
+
+    def test_block_text_newline_after_block(self):
+        self._testy(
+            'paragraph[img src="butts"]\nparagraph',
+            'paragraph<img src="butts">paragraph',
+        )
+
+
 
 
 
