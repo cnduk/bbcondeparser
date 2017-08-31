@@ -71,6 +71,11 @@ class BaseHTMLTagMeta(BaseTagMeta):
                 "Cannot enable convert_paragraphs "
                 "on inline tag {tag_cls.tag_name}".format(tag_cls=tag_cls))
 
+        if not is_inline_tag(tag_cls) and not is_block_tag(tag_cls):
+            raise RuntimeError(
+                "Unknown tag display type: {tag_cls.tag_type}"
+                "on {tag_cls.tag_name}".format(tag_cls=tag_cls))
+
 
 @six.add_metaclass(BaseHTMLTagMeta)
 class BaseHTMLTag(BaseTag):
