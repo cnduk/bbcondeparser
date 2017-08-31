@@ -205,6 +205,8 @@ class HtmlSimpleTag(BaseHTMLTag):
         template (str): basic template
     """
 
+    convert_newlines = False
+    convert_paragraphs = False
     template = None
     replace_text = '{{ body }}'
 
