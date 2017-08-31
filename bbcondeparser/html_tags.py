@@ -1,3 +1,4 @@
+
 # Copyright (c) 2017 Conde Nast Britain
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -7,8 +8,8 @@
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
 #
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 #
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -30,35 +31,85 @@ HTML_NEWLINE = '<br />'
 
 
 def is_inline_tag(tag):
+    """Check if the tag is inline.
+
+    Args:
+        tag (BaseHTMLTag): the tag to check
+
+    Returns:
+        bool: is it inline?
+    """
     return getattr(tag, 'tag_display', None) == 'inline'
 
 
 def is_block_tag(tag):
+    """Check if the tag is block.
+
+    Args:
+        tag (BaseHTMLTag): the tag to check
+
+    Returns:
+        bool: is it block?
+    """
     return getattr(tag, 'tag_display', None) == 'block'
 
 
 def escape_html(text):
+    """Escape html text.
+
+    Args:
+        text (str): text to escape
+
+    Returns:
+        str: the escaped text
+    """
     return cgi.escape(text, quote=True)
 
 
 class HTMLNewlineText(NewlineText):
+    """HTML version of NewlineText."""
+
     def _render(self):
         return '<br />' * self.count
 
 
 class HTMLText(RawText):
+    """HTML version of RawText."""
+
     def render(self, **kwargs):
+        """Render the text.
+
+        Args:
+            **kwargs: things
+
+        Returns:
+            str: escaped html text
+        """
         text = self._render()
         return escape_html(text)
 
     def render_raw(self):
-        # Want to escape html
+        """Render the text un-html-escaped.
+
+        Returns:
+            str: the raw text
+        """
         return self.render()
 
 
 class BaseHTMLTagMeta(BaseTagMeta):
+    """Metaclass oh boy oh boy."""
+
     @staticmethod
     def validate_tag_cls(tag_cls):
+        """Validate the class being created.
+
+        Args:
+            tag_cls (BaseHTMLTag): tag class
+
+        Raises:
+            RuntimeError: if some values are set and shouldnt
+        """
         BaseTagMeta.validate_tag_cls(tag_cls)
 
         if tag_cls.strip_newlines and tag_cls.convert_newlines:
@@ -79,13 +130,30 @@ class BaseHTMLTagMeta(BaseTagMeta):
 
 @six.add_metaclass(BaseHTMLTagMeta)
 class BaseHTMLTag(BaseTag):
+    """BaseHTMLTag, used for all HTML tags.
+
+    Attributes:
+        convert_newlines (bool): convert newlines to the HTML equivalent
+        convert_paragraphs (bool): convert double newlines to paragraphs
+        tag_display (str): tag display mode - block or inline
+    """
+
     tag_display = 'inline'
-    convert_newlines = False  # converts newlines to HTML_NEWLINE
+    convert_newlines = False
     convert_paragraphs = False
 
     def render_children(self, convert_newlines=None, convert_paragraphs=None,
                         strip_newlines=False):
+        """Render the children of the tag.
 
+        Args:
+            convert_newlines (None, optional): convert newline overwrite
+            convert_paragraphs (None, optional): convert paragraph overwrite
+            strip_newlines (bool, optional): strip newline overwrite
+
+        Returns:
+            str: rendered children
+        """
         if convert_newlines is False:
             convert_newlines = False
         else:
@@ -118,6 +186,13 @@ class BaseHTMLTag(BaseTag):
 
 
 class HtmlSimpleTag(BaseHTMLTag):
+    """HTML version of SimpleTag.
+
+    Attributes:
+        replace_text (str): text to replace in template
+        template (str): basic template
+    """
+
     template = None
     replace_text = '{{ body }}'
 
@@ -131,44 +206,50 @@ class HtmlSimpleTag(BaseHTMLTag):
 
 
 class BaseHTMLRenderTreeParser(BaseTreeParser):
-    """
-    I've been intensely thinking about how the paragraphs and newline
+    """I've been intensely thinking about how the paragraphs and newline
     conversions should work and this is how:
 
     The parent of the node, whether that be another node or the parser
-    passes down if the values should be converted but only if its False. For
-    instance, if the parser is False for newlines and paragraphs, nowhere
-    should there be converted newlines or paragraphs.
+    passes down if the values should be converted but only if its False.
+    For instance, if the parser is False for newlines and paragraphs,
+    nowhere should there be converted newlines or paragraphs.
 
     However if we think of this:
+        parser {convert_newlines=True}
+            text
+            infobox {convert_newlines=False}
+                text
+                text
+                infobox2 {convert_newlines=True}
+                    text
+                    text
+                text
+            text
 
-    parser {convert_newlines=True}
-        text
-        infobox {convert_newlines=False}
-            text
-            text
-            infobox2 {convert_newlines=True}
-                text
-                text
-            text
-        text
+        should produce
 
-    should produce
+        parser {convert_newlines=True}
+            text
+            <br />
+            infobox {convert_newlines=False}
+                text
+                text
+                infobox2 {convert_newlines=True}
+                    text
+                    text
+                text
+            <br />
+            text
 
-    parser {convert_newlines=True}
-        text
-        <br />
-        infobox {convert_newlines=False}
-            text
-            text
-            infobox2 {convert_newlines=True}
-                text
-                text
-            text
-        <br />
-        text
+    Attributes:
+        convert_newlines (bool): allow newline conversion
+        convert_paragraphs (bool): allow paragraph conversion
+        newline_text_class (NewlineText): type of class to use for newlines
+        raw_text_class (RawText): type of class to use for raw text
+        strip_newlines (bool): remove newlines
 
     """
+
     raw_text_class = HTMLText
     newline_text_class = HTMLNewlineText
     convert_newlines = False
@@ -176,6 +257,11 @@ class BaseHTMLRenderTreeParser(BaseTreeParser):
     strip_newlines = False
 
     def render(self):
+        """Render the tag.
+
+        Returns:
+            str: the rendered tag
+        """
         child_text = render_tree(
             self.tree, self.convert_newlines, self.convert_paragraphs,
             self.strip_newlines,
@@ -185,6 +271,15 @@ class BaseHTMLRenderTreeParser(BaseTreeParser):
 
 
 def peek_node(tree, node_index):
+    """Have a cheeky look at the next node in the tree.
+
+    Args:
+        tree (list): list of nodes
+        node_index (int): node index to look at
+
+    Returns:
+        Tag, False: found tag or False if nothing is found
+    """
     try:
         return tree[node_index]
     except IndexError:
@@ -193,10 +288,17 @@ def peek_node(tree, node_index):
 
 def render_tree(tree, convert_newlines=False, convert_paragraphs=False,
                 strip_newlines=False):
-    """Walks through the nodes in the tree trying to work out where the
-       correct location is to insert paragraph tags
-    """
+    """Render the tree of tags.
 
+    Args:
+        tree (list): list of tags
+        convert_newlines (bool, optional): whether to convert newlines
+        convert_paragraphs (bool, optional): whether to convert paragraphs
+        strip_newlines (bool, optional): whether to strip newlines
+
+    Returns:
+        str: rendered children
+    """
     rendered_children = []
     inside_paragraph = False
 
