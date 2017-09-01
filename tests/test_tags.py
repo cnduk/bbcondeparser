@@ -40,6 +40,19 @@ class TestTagCategory(unittest.TestCase):
         self.assertEqual(expected_tag_classes, category.tag_classes)
         self.assertIs(WrappedGrass, Grass)
 
+    def test_remove_tag(self):
+        category = tags.TagCategory('Test cow')
+
+        class Tag1(tags.BaseTag):
+            tag_name = 'milk'
+
+        category.add_tag_cls(Tag1)
+        category.remove_tag_cls(Tag1)
+
+        expected_tag_classes = set()
+
+        self.assertEqual(expected_tag_classes, category.tag_classes)
+
 
 class TestAllowedTags(unittest.TestCase):
     def test_none_defined(self):

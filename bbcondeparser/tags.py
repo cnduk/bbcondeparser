@@ -151,6 +151,18 @@ class TagCategory(object):
 
         return tag_cls
 
+    def remove_tag_cls(self, tag_cls):
+        """Remove a tag from the category.
+
+        Args:
+            tag_cls (BaseTag): the tag to remove
+        """
+        assert issubclass(tag_cls, BaseTag)
+        try:
+            self.tag_classes.remove(tag_cls)
+        except KeyError:
+            pass
+
     __call__ = add_tag_cls
 
 
