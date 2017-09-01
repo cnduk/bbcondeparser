@@ -12,3 +12,10 @@ bbcondeparser.egg-info/
 /.eggs
 /build
 /dist
+
+.Python
+bin
+include
+lib
+man
+pip-selfcheck.json
