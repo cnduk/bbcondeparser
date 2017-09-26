@@ -307,6 +307,13 @@ def peek_node(tree, node_index):
         return False
 
 
+def is_open_paragraph(node, convert_paragraphs, inside_paragraph):
+    return node\
+        and (is_inline_tag(node) or isinstance(node, HTMLText))\
+        and convert_paragraphs\
+        and not inside_paragraph
+
+
 def render_tree(parent_node, convert_newlines=False, convert_paragraphs=False,
                 strip_newlines=False):
     """Render the tree of tags.
@@ -328,7 +335,7 @@ def render_tree(parent_node, convert_newlines=False, convert_paragraphs=False,
     for node_index, node in enumerate(tree):
 
         if is_inline_tag(node):
-            if convert_paragraphs and not inside_paragraph:
+            if is_open_paragraph(node, convert_paragraphs, inside_paragraph):
                 rendered_children.append('<p>')
                 inside_paragraph = True
             rendered_children.append(node.render(
@@ -353,7 +360,7 @@ def render_tree(parent_node, convert_newlines=False, convert_paragraphs=False,
                 ))
 
         elif isinstance(node, HTMLText):
-            if convert_paragraphs and not inside_paragraph:
+            if is_open_paragraph(node, convert_paragraphs, inside_paragraph):
                 rendered_children.append('<p>')
                 inside_paragraph = True
             rendered_children.append(node.render())
@@ -377,9 +384,11 @@ def render_tree(parent_node, convert_newlines=False, convert_paragraphs=False,
                     rendered_children.append(node.render_raw())
 
             else:
+                next_node = peek_node(tree, node_index + 1)
                 if convert_newlines:
-                    rendered_children.append(node.render())
-
+                    if not is_open_paragraph(
+                            next_node, convert_paragraphs, inside_paragraph):
+                        rendered_children.append(node.render())
                 elif not strip_newlines:
                     rendered_children.append(node.render_raw())
 

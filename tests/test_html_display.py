@@ -644,6 +644,13 @@ class NewlinesParagraphsTest(BaseTest):
             '<p><strong>bold text</strong><br />line break</p><div><p><em>italic content</em></p></div>',
         )
 
+    def test_no_br_in_between_blocks(self):
+        self._run_tests(
+            ParagraphNewlinesParser,
+            "[div]This is a block[/div]\nThis content doesn't matter at all!",
+            "<div><p>This is a block</p></div><p>This content doesn't matter at all!</p>",
+        )
+
 
 class ParagraphsStripNewlinesTest(BaseTest):
 
