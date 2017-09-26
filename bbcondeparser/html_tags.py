@@ -23,11 +23,12 @@ import cgi
 
 from . import _six as six
 
-from .tags import RawText, BaseTagMeta, BaseTag, NewlineText
+from .tags import RawText, BaseTagMeta, BaseTag, NewlineText, ErrorText
 from .tree_parser import BaseTreeParser
 
 
 HTML_NEWLINE = '<br />'
+RENDERABLE_TEXT = (ErrorText, RawText)
 
 
 def is_inline_tag(tag):
@@ -309,7 +310,7 @@ def peek_node(tree, node_index):
 
 def is_open_paragraph(node, convert_paragraphs, inside_paragraph):
     return node\
-        and (is_inline_tag(node) or isinstance(node, HTMLText))\
+        and (is_inline_tag(node) or isinstance(node, RENDERABLE_TEXT))\
         and convert_paragraphs\
         and not inside_paragraph
 
@@ -359,7 +360,7 @@ def render_tree(parent_node, convert_newlines=False, convert_paragraphs=False,
                     strip_newlines=strip_newlines,
                 ))
 
-        elif isinstance(node, HTMLText):
+        elif isinstance(node, RENDERABLE_TEXT):
             if is_open_paragraph(node, convert_paragraphs, inside_paragraph):
                 rendered_children.append('<p>')
                 inside_paragraph = True

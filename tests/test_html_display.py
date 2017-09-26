@@ -376,6 +376,12 @@ class StripNewlinesNotParagraphsParser(BaseHTMLRenderTreeParser):
     strip_newlines = True
 
 
+class RenderSelectedTagsParser(BaseHTMLRenderTreeParser):
+    tags = [
+        INLINE_TAGS,
+    ]
+
+
 ###############################################################################
 # Unit test classes doon 'ere!
 ###############################################################################
@@ -687,4 +693,21 @@ class ParagraphsStripNewlinesTest(BaseTest):
             StripNewlinesNotParagraphsParser,
             '[b]bold text[/b]\nline break[div][i]italic content[/i][/div]',
             '<p><strong>bold text</strong>line break</p><div><p><em>italic content</em></p></div>',
+        )
+
+
+class RenderSelectedTagsTest(BaseTest):
+
+    def test_render_tags(self):
+        self._run_tests(
+            RenderSelectedTagsParser,
+            "[b]bold text[/b]",
+            "<strong>bold text</strong>",
+        )
+
+    def test_render_raw_missing_tags(self):
+        self._run_tests(
+            RenderSelectedTagsParser,
+            "[b]bold text[/b][unknown]dunno about this[/unknown]",
+            "<strong>bold text</strong>[unknown]dunno about this[/unknown]",
         )
