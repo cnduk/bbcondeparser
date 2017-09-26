@@ -22,12 +22,13 @@ from .tags import (
     BaseTag, RawText, ErrorText, SimpleTag, TagCategory,
 )
 from .tree_parser import BaseTreeParser
-from .html_tags import HTMLText, BaseHTMLTag, BaseHTMLRenderTreeParser
+from .html_tags import (
+    HTMLText, BaseHTMLTag, BaseHTMLRenderTreeParser, HtmlSimpleTag)
 
 __version__ = '0.0.7'
 
 __all__ = [
     'BaseTag', 'RawText', 'ErrorText', 'SimpleTag', 'TagCategory',
-    'BaseTreeParser', 'HTMLText', 'BaseHTMLTag', 'BaseHTMLRenderTreeParser',
-    '__version__',
+    'BaseTreeParser', 'HTMLText', 'BaseHTMLTag', 'HtmlSimpleTag',
+    'BaseHTMLRenderTreeParser', '__version__',
 ]
