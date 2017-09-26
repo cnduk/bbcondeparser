@@ -568,6 +568,13 @@ class ParagraphTests(BaseTest):
             '<p>copy here </p><div><p>wrapped in paragraphs</p><p>wrapped in paragraphs</p><div><div>no paragraphs here</div></div></div><p> copy here</p>',
         )
 
+    def test_keep_newlines(self):
+        self._run_tests(
+            ParagraphParser,
+            "p1\n\np2\np2 still\n\np3",
+            "<p>p1</p><p>p2\np2 still</p><p>p3</p>",
+        )
+
 
 class StripNewlinesTest(BaseTest):
 
@@ -648,7 +655,7 @@ class NewlinesParagraphsTest(BaseTest):
         self._run_tests(
             ParagraphNewlinesParser,
             "[div]This is a block[/div]\nThis content doesn't matter at all!",
-            "<div><p>This is a block</p></div><p>This content doesn't matter at all!</p>",
+            "<div><p>This is a block</p></div>\n<p>This content doesn't matter at all!</p>",
         )
 
 

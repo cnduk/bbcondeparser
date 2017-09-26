@@ -377,6 +377,9 @@ def render_tree(parent_node, convert_newlines=False, convert_paragraphs=False,
                         rendered_children.append('<p>')
                         inside_paragraph = True
 
+                    elif not strip_newlines:
+                        rendered_children.append(node.render_raw())
+
                 elif convert_newlines:
                     rendered_children.append(node.render())
 
@@ -389,6 +392,10 @@ def render_tree(parent_node, convert_newlines=False, convert_paragraphs=False,
                     if not is_open_paragraph(
                             next_node, convert_paragraphs, inside_paragraph):
                         rendered_children.append(node.render())
+
+                    elif not strip_newlines:
+                        rendered_children.append(node.render_raw())
+
                 elif not strip_newlines:
                     rendered_children.append(node.render_raw())
 
