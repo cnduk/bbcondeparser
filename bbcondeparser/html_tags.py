@@ -73,11 +73,14 @@ class HTMLNewlineText(NewlineText):
     def _render(self):
         return '<br />' * self.count
 
+    def render(self, *args, **kwargs):
+        return super(HTMLNewlineText, self).render()
+
 
 class HTMLText(RawText):
     """HTML version of RawText."""
 
-    def render(self, **kwargs):
+    def render(self, *args, **kwargs):
         """Render the text.
 
         Args:
