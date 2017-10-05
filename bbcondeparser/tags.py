@@ -7,8 +7,8 @@
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
 #
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 #
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -107,7 +107,7 @@ class BaseTagMeta(type):
             null_ctx.pop('__classcell__', None)
             null_ctx['render'] = render
             new_null_cls = super(BaseTagMeta, cls).__new__(
-                    cls, null_name, bases, null_ctx)
+                cls, null_name, bases, null_ctx)
 
             new_cls.null_class = new_null_cls
             new_null_cls.null_class = new_null_cls
@@ -153,7 +153,7 @@ class TagCategory(object):
                     "Cannot add {tag_cls} to tag category"
                     " '{self}' as name '{tag_cls.tag_name}'"
                     " clashes with tag {curr_tag_cls}."
-                .format(**locals()))
+                    .format(**locals()))
 
         self.tag_classes.add(tag_cls)
 
@@ -303,7 +303,8 @@ class BaseTag(_BaseNode):
 
         child_fmts = []
         for child in self.tree:
-            child_fmts.append(getattr(child, 'pretty_format', child.__repr__)())
+            child_fmts.append(
+                getattr(child, 'pretty_format', child.__repr__)())
 
         fmt_child_list = '\n'.join(
             '{}{}'.format(indent, line)
@@ -373,7 +374,7 @@ class BaseTag(_BaseNode):
                 except ValueError as e:
                     self.errors.append(
                         'failed to parse attr {} with value {}: {}'.format(
-                        attr_key, attr_val, e,
+                            attr_key, attr_val, e,
                         )
                     )
                     continue
@@ -393,13 +394,13 @@ class BaseTag(_BaseNode):
                     )
 
 
-
 class SimpleTag(BaseTag):
     # use one '{{ body }}' to be replaced with the contents
     # of the items children
     # e.g. "<awesometext>{{ body }}</awesometext>"
     template = None
     replace_text = '{{ body }}'
+
     def _render(self):
         if self.template is None:
             return self.render_children()
