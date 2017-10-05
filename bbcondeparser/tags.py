@@ -26,7 +26,15 @@ from .utils import strip_newlines
 NEWLINE_STR = '\n'
 
 
-class BaseText(object):
+class _BaseNode(object):
+    def __init__(self):
+        self.parent_node = None
+
+    def set_parent_node(self, parent_node):
+        self.parent_node = parent_node
+
+
+class BaseText(_BaseNode):
     def __init__(self, text):
         self.text = text
 
@@ -167,7 +175,7 @@ class TagCategory(object):
 
 
 @six.add_metaclass(BaseTagMeta)
-class BaseTag(object):
+class BaseTag(_BaseNode):
     """Base class for representing BB Code tags to be used in a section of
     BB Code markup.
 
@@ -267,6 +275,10 @@ class BaseTag(object):
 
         self.errors = []
         self._parse_attrs(attrs)
+
+        for node in self.tree:
+            if isinstance(node, _BaseNode):
+                node.set_parent_node(self)
 
     def __repr__(self):
         return '{}({}: {})'.format(
