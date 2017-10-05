@@ -28,10 +28,10 @@ NEWLINE_STR = '\n'
 
 class _BaseNode(object):
     def __init__(self):
-        self.parent_node = None
+        self._parent_node = None
 
     def set_parent_node(self, parent_node):
-        self.parent_node = parent_node
+        self._parent_node = parent_node
 
 
 class BaseText(_BaseNode):
