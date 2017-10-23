@@ -612,3 +612,163 @@ class TestBadToken(unittest.TestCase):
         inst.tokens = [object()]
         with self.assertRaises(TypeError):
             inst.parse_tree()
+
+
+class TestTreeParserContext(unittest.TestCase):
+
+    def test_context_passed(self):
+        class Bold(MockBaseTag):
+            tag_name = 'b'
+
+            def _render(self):
+                ctx = self.get_context()
+                return '<b>{bold}. {children}</b>'.format(
+                    bold=ctx['b'],
+                    children=self.render_children(),
+                )
+
+        class Italic(MockBaseTag):
+            tag_name = 'i'
+
+            def _render(self):
+                ctx = self.get_context()
+                return '<i>{italic}. {children}</i>'.format(
+                    italic=ctx['i'],
+                    children=self.render_children()
+                )
+
+        class TestParser(tree_parser.BaseTreeParser):
+            tags = [Bold, Bold, Italic]
+            context_default = {
+                'b': 'bold',
+                'i': 'italic',
+            }
+
+        input_text = "[b][i]It's not a tumor![/i][/b]"
+        expected_text = "<b>bold. <i>italic. It's not a tumor!</i></b>"
+
+        inst = TestParser(input_text)
+        result_text = inst.render()
+
+        self.assertEqual(expected_text, result_text)
+
+    def test_context_reset(self):
+        class Bold(MockBaseTag):
+            tag_name = 'b'
+
+            def _render(self):
+                ctx = self.get_context()
+                return '<b>{bold}. {children}</b>'.format(
+                    bold=ctx['b'],
+                    children=self.render_children(),
+                )
+
+        class Italic(MockBaseTag):
+            tag_name = 'i'
+
+            def _render(self):
+                ctx = self.get_context()
+                return '<i>{italic}. {children}</i>'.format(
+                    italic=ctx['i'],
+                    children=self.render_children()
+                )
+
+        class TestParser(tree_parser.BaseTreeParser):
+            tags = [Bold, Bold, Italic]
+            context_default = {
+                'b': 'bold',
+                'i': 'italic',
+            }
+
+        input_text = "[b][i]It's not a tumor![/i][/b]"
+        expected_text = "<b>bold. <i>italic. It's not a tumor!</i></b>"
+
+        inst = TestParser(input_text)
+        default_context = inst.get_context()
+        result_text = inst.render()
+        self.assertEqual(expected_text, result_text)
+        self.assertEqual(inst.get_context(), default_context)
+
+    def test_context_updates(self):
+        class Bold(MockBaseTag):
+            tag_name = 'b'
+
+            def _render(self):
+                ctx = self.get_context()
+                return '<b>{bold}. {children}</b>'.format(
+                    bold=ctx['b'],
+                    children=self.render_children(),
+                )
+
+        class Italic(MockBaseTag):
+            tag_name = 'i'
+
+            def _render(self):
+                ctx = self.get_context()
+                return '<i>{italic}. {children}</i>'.format(
+                    italic=ctx['i'],
+                    children=self.render_children()
+                )
+
+        class TestParser(tree_parser.BaseTreeParser):
+            tags = [Bold, Bold, Italic]
+            context_default = {
+                'b': 'bold',
+                'i': 'italic',
+            }
+
+        input_text = "[b][i]It's not a tumor![/i][/b]"
+        expected_text = "<b>italic. <i>italic. It's not a tumor!</i></b>"
+
+        inst = TestParser(input_text)
+        result_text = inst.render(ctx={
+            'b': 'italic',
+        })
+
+        self.assertEqual(expected_text, result_text)
+
+    def test_context_tag_updates(self):
+        class Bold(MockBaseTag):
+            tag_name = 'b'
+            context_default = {
+                'b': 'gold',
+                'i': 'silver',
+            }
+
+            def _render(self):
+                ctx = self.get_context()
+                return '<b>{bold}. {children}</b>'.format(
+                    bold=ctx['b'],
+                    children=self.render_children(),
+                )
+
+        class Italic(MockBaseTag):
+            tag_name = 'i'
+            context_default = {
+                'b': 'bronze',
+                'i': 'bronze',
+            }
+
+            def _render(self):
+                ctx = self.get_context()
+                return '<i>{italic}. {children}</i>'.format(
+                    italic=ctx['i'],
+                    children=self.render_children()
+                )
+
+        class TestParser(tree_parser.BaseTreeParser):
+            tags = [Bold, Bold, Italic]
+            context_default = {
+                'b': 'bold',
+                'i': 'italic',
+            }
+
+        input_text = "[b][i]It's not a tumor![/i][/b]"
+        expected_text = "<b>gold. <i>bronze. It's not a tumor!</i></b>"
+
+        inst = TestParser(input_text)
+        result_text = inst.render(ctx={
+            'b': 'italic',
+        })
+
+        self.assertEqual(expected_text, result_text)

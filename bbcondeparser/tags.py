@@ -27,20 +27,49 @@ NEWLINE_STR = '\n'
 
 
 class BaseNode(object):
+    context_default = {}
+
     def __init__(self):
+        self._context = self.context_default.copy()
         self._parent_node = None
 
     def set_parent_node(self, parent_node):
         self._parent_node = parent_node
 
+    def _build_context(self, ctx=None):
+        if self._parent_node:
+            new_ctx = self._parent_node.get_context()
+        else:
+            new_ctx = {}
+
+        new_ctx.update(self.context_default)
+
+        if ctx:
+            new_ctx.update(ctx)
+
+        self._context = new_ctx
+
+    def _reset_context(self):
+        self._context = self.context_default.copy()
+
+    def get_context(self):
+        return self._context
+
+    def render(self, ctx=None):
+        self._build_context(ctx=ctx)
+        rendered_stuff = self._render()
+        self._reset_context()
+
+        return rendered_stuff
+
+    def _render(self):
+        raise NotImplementedError
 
 
 class BaseText(BaseNode):
     def __init__(self, text):
+        super(BaseText, self).__init__()
         self.text = text
-
-    def render(self):
-        return self._render()
 
     def __eq__(self, other):
         return self.__class__ == other.__class__ and self.text == other.text
@@ -64,6 +93,7 @@ class RawText(BaseText):
 
 class NewlineText(BaseText):
     DOUBLE_NEWLINE = NEWLINE_STR * 2
+
     def __init__(self, *args, **kwargs):
         super(NewlineText, self).__init__(*args, **kwargs)
         self.count = 1
@@ -267,9 +297,9 @@ class BaseTag(BaseNode):
         """These classes should not be initialized directly
             (are initialized by the parser).
         """
-
         assert self.self_closing is False or len(tree) == 0
         assert self.self_closing is False or end_text == ''
+        super(BaseTag, self).__init__()
         self.tree = tree
         self.start_text = start_text
         self.end_text = end_text
@@ -326,11 +356,11 @@ class BaseTag(BaseNode):
         """
         return ''.join(child.render() for child in self.tree)
 
-    def render(self):
+    def render(self, ctx=None):
         """Return the rendering of this tag (including children)
             (N.B. This inherintly includes children, no way not to.
         """
-        text = self._render()
+        text = super(BaseTag, self).render(ctx=ctx)
 
         if self.trim_whitespace:
             text = text.strip()

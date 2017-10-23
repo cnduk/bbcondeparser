@@ -31,7 +31,14 @@ from bbcondeparser.token_parser import (
     CloseTagToken,
 )
 
-from bbcondeparser.tags import ErrorText, RawText, NewlineText, parse_tag_set
+from bbcondeparser.tags import (
+    ErrorText,
+    RawText,
+    NewlineText,
+    parse_tag_set,
+    BaseNode,
+)
+
 
 class BaseTreeParser(object):
     tags = []
@@ -41,7 +48,10 @@ class BaseTreeParser(object):
     error_text_class = ErrorText
     newline_text_class = NewlineText
 
+    context_default = {}
+
     def __init__(self, text):
+        self._context = self.context_default.copy()
         self.raw_text = text
 
         ignored_tags = [tag.null_class for tag in self.ignored_tags]
@@ -53,9 +63,29 @@ class BaseTreeParser(object):
             error_text_class=self.error_text_class,
             newline_text_class=self.newline_text_class,
         )
+        for node in self.tree:
+            if isinstance(node, BaseNode):
+                node.set_parent_node(self)
 
-    def render(self):
-        return ''.join(tag.render() for tag in self.tree)
+    def _build_context(self, ctx=None):
+        new_ctx = self.context_default.copy()
+
+        if ctx:
+            new_ctx.update(ctx)
+
+        self._context = new_ctx
+
+    def _reset_context(self):
+        self._context = self.context_default.copy()
+
+    def get_context(self):
+        return self._context
+
+    def render(self, ctx=None):
+        self._build_context(ctx=ctx)
+        rendered_tags = ''.join(tag.render() for tag in self.tree)
+        self._reset_context()
+        return rendered_tags
 
     def pretty_format(self):
         return '\n'.join(
