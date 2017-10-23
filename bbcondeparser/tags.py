@@ -130,8 +130,8 @@ class BaseTagMeta(type):
         cls.validate_tag_cls(new_cls)
 
         if new_cls.tag_name is not None:
-            def render(self):
-                return self.render_children()
+            def render(self, ctx=None):
+                return self.render_children(ctx=ctx)
 
             null_name = 'Null{}'.format(name)
             null_ctx = dict(ctx)
@@ -351,10 +351,10 @@ class BaseTag(BaseNode):
             repr(self.end_text), self.attrs
         )
 
-    def render_children(self):
+    def render_children(self, ctx=None):
         """Return the rendering of child tags/text
         """
-        return ''.join(child.render() for child in self.tree)
+        return ''.join(child.render(ctx=ctx) for child in self.tree)
 
     def render(self, ctx=None):
         """Return the rendering of this tag (including children)
