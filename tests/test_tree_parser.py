@@ -54,11 +54,9 @@ class TestParseTree(unittest.TestCase):
         input_text = "Hello, World!"
         tags = []
 
-        expected_tree = [
-            RootTag({}, [
-                RawText("Hello, World!"),
-            ], '', ''),
-        ]
+        expected_tree = RootTag({}, [
+            RawText("Hello, World!"),
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -72,16 +70,14 @@ class TestParseTree(unittest.TestCase):
         tags = [Tag1]
         input_text = r'[apples a="1" b="2" a="\" "]'
 
-        expected_tree = [
-            RootTag({}, [
-                Tag1(
-                    (('a', '1'), ('b', '2'), ('a', '" ')),
-                    [],
-                    r'[apples a="1" b="2" a="\" "]',
-                    '',
-                ),
-            ], '', ''),
-        ]
+        expected_tree = RootTag({}, [
+            Tag1(
+                (('a', '1'), ('b', '2'), ('a', '" ')),
+                [],
+                r'[apples a="1" b="2" a="\" "]',
+                '',
+            ),
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -95,17 +91,15 @@ class TestParseTree(unittest.TestCase):
         tags = [Tag1]
         input_text = '[banana]A tag like this should turn the text yellow!\n'
 
-        expected_tree = [
-            RootTag({}, [
-                Tag1(
-                    (),
-                    [RawText('A tag like this should turn the text yellow!')],
-                    '[banana]',
-                    '',
-                ),
-                NewlineText('\n'),
-            ], '', ''),
-        ]
+        expected_tree = RootTag({}, [
+            Tag1(
+                (),
+                [RawText('A tag like this should turn the text yellow!')],
+                '[banana]',
+                '',
+            ),
+            NewlineText('\n'),
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -119,17 +113,15 @@ class TestParseTree(unittest.TestCase):
         tags = [Tag1]
         input_text = '[orange]This tag should make the text tangy!\n\n'
 
-        expected_tree = [
-            RootTag({}, [
-                Tag1(
-                    (),
-                    [RawText('This tag should make the text tangy!')],
-                    '[orange]',
-                    '',
-                ),
-                NewlineText('\n\n'),
-            ], '', ''),
-        ]
+        expected_tree = RootTag({}, [
+            Tag1(
+                (),
+                [RawText('This tag should make the text tangy!')],
+                '[orange]',
+                '',
+            ),
+            NewlineText('\n\n'),
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -142,13 +134,11 @@ class TestParseTree(unittest.TestCase):
         tags = [Tag1]
         input_text = 'Hello! [mandarin]This is some lovely text!'
 
-        expected_tree = [
-            RootTag({}, [
-                RawText('Hello! '),
-                ErrorText('[mandarin]'),
-                RawText('This is some lovely text!'),
-            ], '', ''),
-        ]
+        expected_tree = RootTag({}, [
+            RawText('Hello! '),
+            ErrorText('[mandarin]'),
+            RawText('This is some lovely text!'),
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -164,19 +154,17 @@ class TestParseTree(unittest.TestCase):
         tags = [Tag1, Tag2]
         input_text = '[cheese][/banana][/notexist][/cheese]'
 
-        expected_tree = [
-            RootTag({}, [
-                Tag1(
-                    (),
-                    [
-                        ErrorText('[/banana]'),
-                        ErrorText('[/notexist]'),
-                    ],
-                    '[cheese]',
-                    '[/cheese]',
-                )
-            ], '', ''),
-        ]
+        expected_tree = RootTag({}, [
+            Tag1(
+                (),
+                [
+                    ErrorText('[/banana]'),
+                    ErrorText('[/notexist]'),
+                ],
+                '[cheese]',
+                '[/cheese]',
+            )
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -193,23 +181,21 @@ class TestParseTree(unittest.TestCase):
         tags = [OuterTag]
         input_text = '[banana][inner]Hello![/inner][/banana]'
 
-        expected_tree = [
-            RootTag({}, [
-                OuterTag(
-                    (),
-                    [
-                        InnerTag(
-                            (),
-                            [RawText('Hello!')],
-                            '[inner]',
-                            '[/inner]',
-                        )
-                    ],
-                    '[banana]',
-                    '[/banana]',
-                )
-            ], '', ''),
-        ]
+        expected_tree = RootTag({}, [
+            OuterTag(
+                (),
+                [
+                    InnerTag(
+                        (),
+                        [RawText('Hello!')],
+                        '[inner]',
+                        '[/inner]',
+                    )
+                ],
+                '[banana]',
+                '[/banana]',
+            )
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -219,11 +205,9 @@ class TestParseTree(unittest.TestCase):
         input_text = '[imgoingtobreak'
         tags = []
 
-        expected_tree = [
-            RootTag({}, [
-                ErrorText('[imgoingtobreak'),
-            ], '', ''),
-        ]
+        expected_tree = RootTag({}, [
+            ErrorText('[imgoingtobreak'),
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -233,11 +217,9 @@ class TestParseTree(unittest.TestCase):
         input_text = '[this is really broken!]'
         tags = []
 
-        expected_tree = [
-            RootTag({}, [
-                ErrorText('[this is really broken!]')
-            ], '', ''),
-        ]
+        expected_tree = RootTag({}, [
+            ErrorText('[this is really broken!]')
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -250,11 +232,9 @@ class TestParseTree(unittest.TestCase):
         input_text = '[/apple]'
         tags = [Tag1]
 
-        expected_tree = [
-            RootTag({}, [
-                ErrorText('[/apple]')
-            ], '', ''),
-        ]
+        expected_tree = RootTag({}, [
+            ErrorText('[/apple]')
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -264,11 +244,9 @@ class TestParseTree(unittest.TestCase):
         input_text = '[]'
         tags = []
 
-        expected_tree = [
-            RootTag({}, [
-                ErrorText('[]')
-            ], '', ''),
-        ]
+        expected_tree = RootTag({}, [
+            ErrorText('[]')
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -284,12 +262,10 @@ class TestParseTree(unittest.TestCase):
         input_text = '[a][b][/a][/b]'
         tags = [Tag1, Tag2]
 
-        expected_tree = [
-            RootTag({}, [
-                Tag1((), [ErrorText('[b]')], '[a]', '[/a]'),
-                ErrorText('[/b]'),
-            ], '', '')
-        ]
+        expected_tree = RootTag({}, [
+            Tag1((), [ErrorText('[b]')], '[a]', '[/a]'),
+            ErrorText('[/b]'),
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -306,13 +282,11 @@ class TestParseTree(unittest.TestCase):
         input_text = '[a][b]\n[/b]'
         tags = [Tag1, Tag2]
 
-        expected_tree = [
-            RootTag({}, [
-                Tag1((), [ErrorText('[b]')], '[a]', ''),
-                NewlineText('\n'),
-                ErrorText('[/b]'),
-            ], '', '')
-        ]
+        expected_tree = RootTag({}, [
+            Tag1((), [ErrorText('[b]')], '[a]', ''),
+            NewlineText('\n'),
+            ErrorText('[/b]'),
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -326,18 +300,16 @@ class TestParseTree(unittest.TestCase):
         input_text = '[a][a][a]text\n[/a][/a]'
         tags = [Tag1]
 
-        expected_tree = [
-            RootTag({}, [
+        expected_tree = RootTag({}, [
+            Tag1((), [
                 Tag1((), [
-                    Tag1((), [
-                        Tag1((), [RawText("text")], '[a]', ''),
-                    ], '[a]', ''),
+                    Tag1((), [RawText("text")], '[a]', ''),
                 ], '[a]', ''),
-                NewlineText('\n'),
-                ErrorText("[/a]"),
-                ErrorText("[/a]"),
-            ], '', '')
-        ]
+            ], '[a]', ''),
+            NewlineText('\n'),
+            ErrorText("[/a]"),
+            ErrorText("[/a]"),
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
         self.assertEqual(expected_tree, result)
@@ -377,30 +349,28 @@ class TestParseTree(unittest.TestCase):
             '[inner-b]'
         )
 
-        expected_tree = [
-            RootTag({}, [
-                 OuterTag1((),
-                     [
-                         InnerTag1((),[RawText("Hello")],'[inner-a]','[/inner-a]'),
-                         InnerTag2((),[],'[inner-b]',''),
-                         OuterTag1.null_class((), [RawText('fail')], '[outer-banana]', '[/outer-banana]'),
-                         OuterTag2.null_class((), [RawText('also fail')], '[outer-apple]', '[/outer-apple]'),
-                     ],
-                     '[outer-banana]','[/outer-banana]',
-                 ),
-                OuterTag2((),
-                     [
-                         InnerTag1((),[RawText("This works!")],'[inner-a]','[/inner-a]'),
-                         ErrorText('[inner-b]'),
-                         OuterTag1.null_class((), [RawText('also also also fail')], '[outer-banana]', '[/outer-banana]'),
-                         OuterTag2.null_class((), [RawText('applefail')], '[outer-apple]', '[/outer-apple]'),
-                     ],
-                     '[outer-apple]','[/outer-apple]',
-                 ),
-                 ErrorText('[inner-a]'), RawText('Should be inside something!'), ErrorText('[/inner-a]'),
-                 ErrorText('[inner-b]'),
-            ], '', '')
-        ]
+        expected_tree = RootTag({}, [
+             OuterTag1((),
+                 [
+                     InnerTag1((),[RawText("Hello")],'[inner-a]','[/inner-a]'),
+                     InnerTag2((),[],'[inner-b]',''),
+                     OuterTag1.null_class((), [RawText('fail')], '[outer-banana]', '[/outer-banana]'),
+                     OuterTag2.null_class((), [RawText('also fail')], '[outer-apple]', '[/outer-apple]'),
+                 ],
+                 '[outer-banana]','[/outer-banana]',
+             ),
+            OuterTag2((),
+                 [
+                     InnerTag1((),[RawText("This works!")],'[inner-a]','[/inner-a]'),
+                     ErrorText('[inner-b]'),
+                     OuterTag1.null_class((), [RawText('also also also fail')], '[outer-banana]', '[/outer-banana]'),
+                     OuterTag2.null_class((), [RawText('applefail')], '[outer-apple]', '[/outer-apple]'),
+                 ],
+                 '[outer-apple]','[/outer-apple]',
+             ),
+             ErrorText('[inner-a]'), RawText('Should be inside something!'), ErrorText('[/inner-a]'),
+             ErrorText('[inner-b]'),
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -434,17 +404,15 @@ class TestParseTree(unittest.TestCase):
         # This is obvious, but was missed in the first couple iteration of the
         # tree parser, and I wanted to ensure that this situation makes sense.
 
-        expected_tree = [
-            RootTag({}, [
-                OuterTag((),
-                    [
-                        ErrorText("[B]"),
-                        ErrorText("[C]"),
-                    ],
-                    '[A]', '[/A]',
-                ),
-            ], '', '')
-        ]
+        expected_tree = RootTag({}, [
+            OuterTag((),
+                [
+                    ErrorText("[B]"),
+                    ErrorText("[C]"),
+                ],
+                '[A]', '[/A]',
+            ),
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -470,18 +438,16 @@ class TestParseTree(unittest.TestCase):
         tags = [OuterTag]
         input_text = '[A][B][C]\n'
 
-        expected_tree = [
-            RootTag({}, [
-                OuterTag((),
-                    [
-                        ErrorText("[B]"),
-                        ErrorText("[C]"),
-                    ],
-                    '[A]', '',
-                ),
-                NewlineText('\n'),
-            ], '', '')
-        ]
+        expected_tree = RootTag({}, [
+            OuterTag((),
+                [
+                    ErrorText("[B]"),
+                    ErrorText("[C]"),
+                ],
+                '[A]', '',
+            ),
+            NewlineText('\n'),
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -502,12 +468,10 @@ class TestParseTree(unittest.TestCase):
 
         input_text = '[A][B]'
 
-        expected_tree = [
-            RootTag({}, [
-                ErrorText("[A]"),
-                ErrorText("[B]"),
-            ], '', '')
-        ]
+        expected_tree = RootTag({}, [
+            ErrorText("[A]"),
+            ErrorText("[B]"),
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -525,17 +489,15 @@ class TestParseTree(unittest.TestCase):
 
         input_text = r'[a][b x="z" y="a \" banana"]Hello, world![/b]'
 
-        expected_tree = [
-            RootTag({}, [
-                Tag1((), [], '[a]', ''),
-                Tag2(
-                    (('x', 'z'),('y', 'a " banana')),
-                    [RawText("Hello, world!")],
-                    r'[b x="z" y="a \" banana"]',
-                    '[/b]',
-                )
-            ], '', '')
-        ]
+        expected_tree = RootTag({}, [
+            Tag1((), [], '[a]', ''),
+            Tag2(
+                (('x', 'z'),('y', 'a " banana')),
+                [RawText("Hello, world!")],
+                r'[b x="z" y="a \" banana"]',
+                '[/b]',
+            )
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -558,14 +520,12 @@ class TestParseTree(unittest.TestCase):
         tags = [ATag]
         input_text = '[A][B][A][/A][/A]'
 
-        expected_tree = [
-            RootTag({}, [
-                ATag((), [
-                    ErrorText('[B]'), # missing close
-                    ATag.null_class((), [], '[A]', '[/A]'), # Not allowed in context of A
-                ], '[A]', '[/A]'),
-            ], '', '')
-        ]
+        expected_tree = RootTag({}, [
+            ATag((), [
+                ErrorText('[B]'), # missing close
+                ATag.null_class((), [], '[A]', '[/A]'), # Not allowed in context of A
+            ], '[A]', '[/A]'),
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
 
@@ -611,13 +571,11 @@ class TestTreeParser(unittest.TestCase):
 class TestTreeParserNewline(unittest.TestCase):
     def test_newline_tag(self):
         input_text = 'butts\nbutts'
-        expected_tree = [
-            RootTag({}, [
-                RawText('butts'),
-                NewlineText('\n'),
-                RawText('butts'),
-            ], '', ''),
-        ]
+        expected_tree = RootTag({}, [
+            RawText('butts'),
+            NewlineText('\n'),
+            RawText('butts'),
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, [])
 
@@ -626,15 +584,13 @@ class TestTreeParserNewline(unittest.TestCase):
 
     def test_newline_concat(self):
         input_text = 'butts\n\nbutts\n\n\nbutts'
-        expected_tree = [
-            RootTag({}, [
-                RawText('butts'),
-                NewlineText('\n\n'),
-                RawText('butts'),
-                NewlineText('\n\n\n'),
-                RawText('butts'),
-            ], '', ''),
-        ]
+        expected_tree = RootTag({}, [
+            RawText('butts'),
+            NewlineText('\n\n'),
+            RawText('butts'),
+            NewlineText('\n\n\n'),
+            RawText('butts'),
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, [])
 
@@ -642,13 +598,11 @@ class TestTreeParserNewline(unittest.TestCase):
 
     def test_dosnewline(self):
         input_text = 'butts\r\nbutts'
-        expected_tree = [
-            RootTag({}, [
-                RawText('butts'),
-                NewlineText('\r\n'),
-                RawText('butts'),
-            ], '', ''),
-        ]
+        expected_tree = RootTag({}, [
+            RawText('butts'),
+            NewlineText('\r\n'),
+            RawText('butts'),
+        ], '', '')
 
         result = tree_parser.parse_tree(input_text, [])
 

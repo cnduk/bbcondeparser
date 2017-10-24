@@ -60,7 +60,7 @@ class BaseTreeParser(object):
         ignored_tags = [tag.null_class for tag in self.ignored_tags]
         tags = self.tags + ignored_tags
 
-        self.tree = parse_tree(
+        self.root_node = parse_tree(
             text, tags,
             raw_text_class=self.raw_text_class,
             error_text_class=self.error_text_class,
@@ -68,11 +68,11 @@ class BaseTreeParser(object):
             root_tag_class=self.root_tag_class,
         )
         # Pass context_default and context_override to the root node
-        self.tree[0].context_default = self.context_default
-        self.tree[0].context_override = self.context_override
+        self.root_node.context_default = self.context_default
+        self.root_node.context_override = self.context_override
 
         # Update the root node parent to self
-        self.tree[0].set_parent_node(self)
+        self.root_node.set_parent_node(self)
 
     def get_context(self):
         return self._context
@@ -80,13 +80,10 @@ class BaseTreeParser(object):
     def render(self, ctx=None):
         # First node in tree is always a root node so we can pass the context
         # to that node.
-        return self.tree[0].render(ctx=ctx)
+        return self.root_node.render(ctx=ctx)
 
     def pretty_format(self):
-        return '\n'.join(
-            getattr(child, 'pretty_format', child.__repr__)()
-            for child in self.tree
-        )
+        return self.root_node.pretty_format()
 
 
 StackLevel = namedtuple(
@@ -206,7 +203,7 @@ def parse_tree(
     inst = _TreeParser(raw_text, tags, raw_text_class,
             error_text_class, newline_text_class, root_tag_class)
     inst.parse_tree()
-    return inst.tree
+    return inst.root_node
 
 # This class is relatively straight forward, apart from what it does
 # when it encounters an error and has to re-evaluate tokens it's already
@@ -254,8 +251,9 @@ class _TreeParser(object):
         self.tokens = get_tokens(raw_text)
         self.tag_dict = create_tag_dict(tags)
 
+        self._tree = None
         self.stack = TreeStack()
-        self.tree = None
+        self.root_node = None
 
         self.token_index = 0
 
@@ -264,7 +262,7 @@ class _TreeParser(object):
         return self.tag_dict.get(self.token.tag_name)
 
     def parse_tree(self):
-        self.tree = []
+        self._tree = []
         while self.token_index <= len(self.tokens):
             try:
                 self.token = self.tokens[self.token_index]
@@ -298,8 +296,9 @@ class _TreeParser(object):
             self.token_index += 1
 
         # Move tree from self to a root tag
-        root_tag = self.root_tag_class({}, self.tree, '', '')
-        self.tree = [root_tag]
+        root_tag = self.root_tag_class({}, self._tree, '', '')
+        self._tree = None
+        self.root_node = root_tag
 
     def handle_open_token(self):
         if self.tag_cls is None:
@@ -332,7 +331,7 @@ class _TreeParser(object):
                         "differing close tag")
 
             else:
-                tag_tree = self.tree
+                tag_tree = self._tree
                 close_token = self.token
                 self.stack_pop()
                 self.append_tree(self.tag_cls(
@@ -344,8 +343,8 @@ class _TreeParser(object):
         first_newline_close = self.stack.first_newline_close_index()
 
         if first_newline_close == -1:
-            if self.tree and isinstance(self.tree[-1], self.newline_text_class):
-                self.tree[-1].add_newline(self.token.text)
+            if self._tree and isinstance(self._tree[-1], self.newline_text_class):
+                self._tree[-1].add_newline(self.token.text)
             else:
                 self.append_tree(self.newline_text_class(self.token.text))
 
@@ -371,7 +370,7 @@ class _TreeParser(object):
 
                 close_token = self.token
                 while closed_items:
-                    tag_tree = self.tree
+                    tag_tree = self._tree
                     self.set_state(closed_items.pop())
 
                     self.append_tree(self.tag_cls(
@@ -390,9 +389,9 @@ class _TreeParser(object):
             self.append_err("missing close tag")
 
     def stack_push(self):
-        self.stack.push(self.tree, self.tag_dict, self.tag_cls,
+        self.stack.push(self._tree, self.tag_dict, self.tag_cls,
                 self.token, self.token_index)
-        self.tree = []
+        self._tree = []
         self.tag_dict = get_new_tag_dict(self.tag_cls, self.tag_dict)
 
     def stack_reset(self, index, reset=False):
@@ -402,7 +401,7 @@ class _TreeParser(object):
         self.set_state(self.stack.pop(), reset)
 
     def set_state(self, stack_ctx, reset=False):
-        self.tree = stack_ctx.tree
+        self._tree = stack_ctx.tree
         self.tag_dict = stack_ctx.tag_dict
         self.token = stack_ctx.tag_open_token
 
@@ -413,7 +412,7 @@ class _TreeParser(object):
         self.append_tree(self.error_text_class(self.token.text, reason))
 
     def append_tree(self, item):
-        self.tree.append(item)
+        self._tree.append(item)
 
 
 def create_tag_dict(tags):
