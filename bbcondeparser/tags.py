@@ -28,6 +28,7 @@ NEWLINE_STR = '\n'
 
 class BaseNode(object):
     context_default = {}
+    context_override = {}
 
     def __init__(self):
         self._context = self.context_default.copy()
@@ -39,10 +40,15 @@ class BaseNode(object):
     def _build_context(self, ctx=None):
         if self._parent_node:
             new_ctx = self._parent_node.get_context()
-        else:
-            new_ctx = {}
+            for default_key, default_value in self.context_default.iteritems():
+                if default_key not in new_ctx:
+                    new_ctx[default_key] = default_value
 
-        new_ctx.update(self.context_default)
+        else:
+            new_ctx = self.context_default.copy()
+
+        if self.context_override:
+            new_ctx.update(self.context_override)
 
         if ctx:
             new_ctx.update(ctx)
@@ -51,12 +57,13 @@ class BaseNode(object):
 
     def _reset_context(self):
         self._context = self.context_default.copy()
+        self._context.update(self.context_override)
 
     def get_context(self):
         return self._context
 
-    def render(self, ctx=None):
-        self._build_context(ctx=ctx)
+    def render(self):
+        self._build_context()
         rendered_stuff = self._render()
         self._reset_context()
 
@@ -98,6 +105,9 @@ class NewlineText(BaseText):
         super(NewlineText, self).__init__(*args, **kwargs)
         self.count = 1
 
+    def __eq__(self, other):
+        return self.__class__ == other.__class__ and self.text == other.text
+
     def add_newline(self, text):
         self.count += 1
         self.text += text
@@ -130,8 +140,8 @@ class BaseTagMeta(type):
         cls.validate_tag_cls(new_cls)
 
         if new_cls.tag_name is not None:
-            def render(self, ctx=None):
-                return self.render_children(ctx=ctx)
+            def render(self):
+                return self.render_children()
 
             null_name = 'Null{}'.format(name)
             null_ctx = dict(ctx)
@@ -289,9 +299,10 @@ class BaseTag(BaseNode):
 
     attr_defs = {}
 
-    trim_whitespace = False
-
-    strip_newlines = False
+    context_default = {
+        'trim_whitespace': False,
+        'strip_newlines': False,
+    }
 
     def __init__(self, attrs, tree, start_text, end_text):
         """These classes should not be initialized directly
@@ -310,6 +321,11 @@ class BaseTag(BaseNode):
         for node in self.tree:
             if isinstance(node, BaseNode):
                 node.set_parent_node(self)
+
+    def __eq__(self, other):
+        return self.__class__ == other.__class__\
+            and self.attrs == other.attrs\
+            and self.tree == other.tree
 
     def __repr__(self):
         return '{}({}: {})'.format(
@@ -351,22 +367,27 @@ class BaseTag(BaseNode):
             repr(self.end_text), self.attrs
         )
 
-    def render_children(self, ctx=None):
+    def render_children(self):
         """Return the rendering of child tags/text
         """
-        return ''.join(child.render(ctx=ctx) for child in self.tree)
+        return ''.join(child.render() for child in self.tree)
 
-    def render(self, ctx=None):
+    def render(self):
         """Return the rendering of this tag (including children)
             (N.B. This inherintly includes children, no way not to.
         """
-        text = super(BaseTag, self).render(ctx=ctx)
+        text = super(BaseTag, self).render()
 
-        if self.trim_whitespace:
+        self._build_context()
+        new_ctx = self.get_context()
+
+        if new_ctx.get('trim_whitespace', False):
             text = text.strip()
 
-        if self.strip_newlines:
+        if new_ctx.get('strip_newlines', False):
             text = strip_newlines(text)
+
+        self._reset_context()
 
         return text
 
@@ -423,6 +444,15 @@ class BaseTag(BaseNode):
                     self.errors.append(
                         'missing required attr {}'.format(attr_key)
                     )
+
+
+class RootTag(BaseTag):
+
+    def render(self, ctx=None):
+        self._build_context(ctx=ctx)
+        rendered_tags = ''.join(tag.render() for tag in self.tree)
+        self._reset_context()
+        return rendered_tags
 
 
 class SimpleTag(BaseTag):

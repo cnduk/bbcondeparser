@@ -37,6 +37,7 @@ from bbcondeparser.tags import (
     NewlineText,
     parse_tag_set,
     BaseNode,
+    RootTag,
 )
 
 
@@ -47,11 +48,13 @@ class BaseTreeParser(object):
     raw_text_class = RawText
     error_text_class = ErrorText
     newline_text_class = NewlineText
+    root_tag_class = RootTag
 
     context_default = {}
+    context_override = {}
 
     def __init__(self, text):
-        self._context = self.context_default.copy()
+        self._context = {}
         self.raw_text = text
 
         ignored_tags = [tag.null_class for tag in self.ignored_tags]
@@ -62,30 +65,22 @@ class BaseTreeParser(object):
             raw_text_class=self.raw_text_class,
             error_text_class=self.error_text_class,
             newline_text_class=self.newline_text_class,
+            root_tag_class=self.root_tag_class,
         )
-        for node in self.tree:
-            if isinstance(node, BaseNode):
-                node.set_parent_node(self)
+        # Pass context_default and context_override to the root node
+        self.tree[0].context_default = self.context_default
+        self.tree[0].context_override = self.context_override
 
-    def _build_context(self, ctx=None):
-        new_ctx = self.context_default.copy()
-
-        if ctx:
-            new_ctx.update(ctx)
-
-        self._context = new_ctx
-
-    def _reset_context(self):
-        self._context = self.context_default.copy()
+        # Update the root node parent to self
+        self.tree[0].set_parent_node(self)
 
     def get_context(self):
         return self._context
 
     def render(self, ctx=None):
-        self._build_context(ctx=ctx)
-        rendered_tags = ''.join(tag.render() for tag in self.tree)
-        self._reset_context()
-        return rendered_tags
+        # First node in tree is always a root node so we can pass the context
+        # to that node.
+        return self.tree[0].render(ctx=ctx)
 
     def pretty_format(self):
         return '\n'.join(
@@ -203,13 +198,13 @@ class TreeStack(object):
 
 def parse_tree(
     raw_text, tags, raw_text_class=RawText, error_text_class=ErrorText,
-    newline_text_class=NewlineText,
+    newline_text_class=NewlineText, root_tag_class=RootTag,
 ):
     """`raw_text` is the raw bb code (conde format) to be parsed
         `tags` should be an iterable of tag classes allowed in the text
     """
     inst = _TreeParser(raw_text, tags, raw_text_class,
-            error_text_class, newline_text_class)
+            error_text_class, newline_text_class, root_tag_class)
     inst.parse_tree()
     return inst.tree
 
@@ -248,11 +243,13 @@ def parse_tree(
 
 class _TreeParser(object):
     def __init__(self, raw_text, tags, raw_text_class=RawText,
-        error_text_class=ErrorText, newline_text_class=NewlineText
+        error_text_class=ErrorText, newline_text_class=NewlineText,
+        root_tag_class=RootTag,
     ):
         self.raw_text_class = raw_text_class
         self.error_text_class = error_text_class
         self.newline_text_class = newline_text_class
+        self.root_tag_class = root_tag_class
 
         self.tokens = get_tokens(raw_text)
         self.tag_dict = create_tag_dict(tags)
@@ -295,10 +292,14 @@ class _TreeParser(object):
                 self.handle_eof()
 
             else:
-                raise TypeError("Uknown token type: {}".format(
+                raise TypeError("Unknown token type: {}".format(
                         type(self.token)))
 
             self.token_index += 1
+
+        # Move tree from self to a root tag
+        root_tag = self.root_tag_class({}, self.tree, '', '')
+        self.tree = [root_tag]
 
     def handle_open_token(self):
         if self.tag_cls is None:
