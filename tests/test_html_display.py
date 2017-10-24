@@ -32,7 +32,10 @@ class BoldTag(HtmlSimpleTag):
     template = '<strong>{}</strong>'.format(HtmlSimpleTag.replace_text)
     tag_categories = [INLINE_TAGS, BASIC_TAGS, ALL_TAGS]
     allowed_tags = [INLINE_TAGS]
-    convert_newlines = 'inherit'
+    context_override = {
+        'convert_newlines': True,
+    }
+
 
 
 class ItalicTag(HtmlSimpleTag):
@@ -40,7 +43,9 @@ class ItalicTag(HtmlSimpleTag):
     template = '<em>{}</em>'.format(HtmlSimpleTag.replace_text)
     tag_categories = [INLINE_TAGS, BASIC_TAGS, ALL_TAGS]
     allowed_tags = [INLINE_TAGS]
-    convert_newlines = 'inherit'
+    context_override = {
+        'convert_newlines': True,
+    }
 
 
 class ImageTag(BaseHTMLTag):
@@ -67,8 +72,7 @@ class ListTag(BaseHTMLTag):
     tag_categories = [BLOCK_TAGS, ALL_TAGS]
     allowed_tags = [LIST_TAGS]
 
-    def _render(self, convert_newlines=False, convert_paragraphs=False,
-                strip_newlines=False):
+    def _render(self):
 
         tag_type = 'ul'
         if self.attrs['type'] == 'ordered':
@@ -76,11 +80,7 @@ class ListTag(BaseHTMLTag):
 
         return '<{tag_type}>{children}</{tag_type}>'.format(
             tag_type=tag_type,
-            children=self.render_children(
-                convert_newlines=convert_newlines,
-                convert_paragraphs=convert_paragraphs,
-                strip_newlines=strip_newlines,
-            ),
+            children=self.render_children(),
         )
 
 
@@ -89,16 +89,13 @@ class ListItemTag(BaseHTMLTag):
     tag_display = 'block'
     tag_categories = [LIST_TAGS]
     allowed_tags = [BASIC_TAGS]
-    convert_newlines = True
+    context_override = {
+        'convert_newlines': True,
+    }
 
-    def _render(self, convert_newlines=False, convert_paragraphs=False,
-                strip_newlines=False):
+    def _render(self):
         return '<li>{children}</li>'.format(
-            children=self.render_children(
-                convert_newlines=convert_newlines,
-                convert_paragraphs=convert_paragraphs,
-                strip_newlines=strip_newlines,
-            ),
+            children=self.render_children(),
         )
 
 
@@ -107,14 +104,9 @@ class BlockquoteTag(BaseHTMLTag):
     tag_display = 'block'
     tag_categories = [BLOCK_TAGS, ALL_TAGS]
 
-    def _render(self, convert_newlines=False, convert_paragraphs=False,
-                strip_newlines=False):
+    def _render(self):
         return '<blockquote>{children}</blockquote>'.format(
-            children=self.render_children(
-                convert_newlines=convert_newlines,
-                convert_paragraphs=convert_paragraphs,
-                strip_newlines=strip_newlines,
-            ),
+            children=self.render_children(),
         )
 
 
@@ -193,13 +185,8 @@ class InfoBoxTitle(BaseHTMLTag):
     tag_display = 'block'
     allowed_tags = [INLINE_TAGS]
 
-    def _render(self, convert_newlines=False, convert_paragraphs=False,
-                strip_newlines=False):
-        return self.render_title(self.render_children(
-            convert_newlines=convert_newlines,
-            convert_paragraphs=convert_paragraphs,
-            strip_newlines=strip_newlines,
-        ))
+    def _render(self):
+        return self.render_title(self.render_children())
 
     @staticmethod
     def render_title(content):
@@ -221,23 +208,14 @@ class InfoBox(ChildSearcher):
         self._item_instances = self.find_children_instances(
             InfoBoxItem, multi=True)
 
-    def _render(self, convert_newlines=False, convert_paragraphs=False,
-                strip_newlines=False):
+    def _render(self):
         if self._title_instance is None:
             title = InfoBoxTitle.render_title('<NOTITLE>')  # Probably do something nicer
         else:
-            title = self._title_instance.render(
-                convert_newlines=convert_newlines,
-                convert_paragraphs=convert_paragraphs,
-                strip_newlines=strip_newlines,
-            )
+            title = self._title_instance.render()
 
         body = ''.join(
-            item.render(
-                convert_newlines=convert_newlines,
-                convert_paragraphs=convert_paragraphs,
-                strip_newlines=strip_newlines,
-            )
+            item.render()
             for item in self._item_instances
         )
 
@@ -249,7 +227,7 @@ class CodeTag(BaseHTMLTag):
     tag_display = 'block'
     tag_categories = [BLOCK_TAGS, ALL_TAGS]
 
-    def _render(self, **kwargs):
+    def _render(self):
         return '<code><pre>' + self.render_children_raw() + '</code></pre>'
 
 
@@ -257,80 +235,78 @@ class DivTag(BaseHTMLTag):
     tag_name = 'div'
     tag_display = 'block'
     tag_categories = [ALL_TAGS]
-    convert_newlines = 'inherit'
-    convert_paragraphs = 'inherit'
-    strip_newlines = 'inherit'
+    context_override = {
+        'convert_newlines': True,
+        'convert_paragraphs': True,
+        'strip_newlines': True,
+    }
 
-    def _render(self, convert_newlines=False, convert_paragraphs=False,
-                strip_newlines=False):
-
-        return '<div>{children}</div>'.format(children=self.render_children(
-            convert_newlines=convert_newlines,
-            convert_paragraphs=convert_paragraphs,
-            strip_newlines=strip_newlines,
-        ))
+    def _render(self):
+        return '<div>{children}</div>'.format(children=self.render_children())
 
 
 class BaseDivTag(BaseHTMLTag):
     tag_display = 'block'
     tag_categories = [ALL_TAGS]
 
-    def _render(self, convert_newlines=False, convert_paragraphs=False,
-                strip_newlines=False):
-
-        return '<div>{children}</div>'.format(children=self.render_children(
-            convert_newlines=convert_newlines,
-            convert_paragraphs=convert_paragraphs,
-            strip_newlines=strip_newlines,
-        ))
+    def _render(self):
+        return '<div>{children}</div>'.format(children=self.render_children())
 
 
 class NewlineTrueTag(BaseDivTag):
     tag_name = 'newline-true'
-    convert_newlines = True
+    context_override = {
+        'convert_newlines': True,
+    }
 
 
 class NewlineFalseTag(BaseDivTag):
     tag_name = 'newline-false'
-    convert_newlines = False
+    context_override = {
+        'convert_newlines': False,
+    }
 
 
 class NewlineInheritTag(BaseDivTag):
     tag_name = 'newline-inherit'
-    convert_newlines = 'inherit'
 
 
 class ParagraphTrueTag(BaseDivTag):
     tag_name = 'paragraph-true'
-    convert_paragraphs = True
+    context_override = {
+        'convert_paragraphs': True,
+    }
 
 
 class ParagraphFalseTag(BaseDivTag):
     tag_name = 'paragraph-false'
-    convert_paragraphs = False
+    context_override = {
+        'convert_paragraphs': False,
+    }
 
 
 class ParagraphInheritTag(BaseDivTag):
     tag_name = 'paragraph-inherit'
-    convert_paragraphs = 'inherit'
 
 
 class StripNewlinesTrueTag(BaseDivTag):
     tag_name = 'stripnewlines-true'
-    convert_newlines = False
-    strip_newlines = True
+    context_override = {
+        'convert_newlines': False,
+        'strip_newlines': True,
+    }
 
 
 class StripNewlinesFalseTag(BaseDivTag):
     tag_name = 'stripnewlines-false'
-    convert_newlines = False
-    strip_newlines = False
+    context_override = {
+        'convert_newlines': False,
+        'strip_newlines': False,
+    }
 
 
 class StripNewlinesInheritTag(BaseDivTag):
     tag_name = 'stripnewlines-inherit'
-    convert_newlines = False
-    strip_newlines = 'inherit'
 
 
 class DefaultParser(BaseHTMLRenderTreeParser):
@@ -343,37 +319,47 @@ class ParagraphParser(BaseHTMLRenderTreeParser):
     tags = [
         ALL_TAGS,
     ]
-    convert_paragraphs = True
+    context_override = {
+        'convert_paragraphs': True,
+    }
 
 
 class NewlineParser(BaseHTMLRenderTreeParser):
     tags = [
         ALL_TAGS,
     ]
-    convert_newlines = True
+    context_override = {
+        'convert_newlines': True,
+    }
 
 
 class ParagraphNewlinesParser(BaseHTMLRenderTreeParser):
     tags = [
         ALL_TAGS,
     ]
-    convert_paragraphs = True
-    convert_newlines = True
+    context_override = {
+        'convert_paragraphs': True,
+        'convert_newlines': True,
+    }
 
 
 class StripNewlinesParser(BaseHTMLRenderTreeParser):
     tags = [
         ALL_TAGS,
     ]
-    strip_newlines = True
+    context_override = {
+        'strip_newlines': True,
+    }
 
 
 class StripNewlinesNotParagraphsParser(BaseHTMLRenderTreeParser):
     tags = [
         ALL_TAGS,
     ]
-    convert_paragraphs = True
-    strip_newlines = True
+    context_override = {
+        'convert_paragraphs': True,
+        'strip_newlines': True,
+    }
 
 
 class RenderSelectedTagsParser(BaseHTMLRenderTreeParser):
