@@ -221,7 +221,7 @@ class BaseHTMLTag(BaseTag):
             new_ctx = update_dict(new_ctx, ctx)
 
         # Anything that is not a block tag must not render paragraphs
-        if not is_block_tag(self):
+        if is_inline_tag(self):
             new_ctx['convert_paragraphs'] = False
 
         self._context = new_ctx
