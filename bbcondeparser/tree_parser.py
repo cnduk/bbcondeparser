@@ -54,8 +54,13 @@ class BaseTreeParser(object):
         self._context = {}
         self.raw_text = text
 
-        ignored_tags = [tag.null_class for tag in self.ignored_tags]
-        tags = self.tags + ignored_tags
+        tags = parse_tag_set(self.tags)
+        ignored_tags = set(
+            tag.null_class
+            for tag in parse_tag_set(self.ignored_tags)
+            if tag not in tags
+        )
+        tags.update(ignored_tags)
 
         self.root_node = parse_tree(
             text, tags,
