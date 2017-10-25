@@ -641,59 +641,24 @@ class TestTreeParserContext(unittest.TestCase):
 
         class TestParser(tree_parser.BaseTreeParser):
             tags = [Bold, Bold, Italic]
-            context_override = {
-                'b': 'bold',
-                'i': 'italic',
-            }
 
         input_text = "[b][i]It's not a tumor![/i][/b]"
         expected_text = "<b>bold. <i>italic. It's not a tumor!</i></b>"
 
         inst = TestParser(input_text)
-        result_text = inst.render()
+        result_text = inst.render(ctx={
+            'b': 'bold',
+            'i': 'italic',
+        })
 
         self.assertEqual(expected_text, result_text)
-
-    def test_context_reset(self):
-        class Bold(MockBaseTag):
-            tag_name = 'b'
-
-            def _render(self):
-                ctx = self.get_context()
-                return '<b>{bold}. {children}</b>'.format(
-                    bold=ctx['b'],
-                    children=self.render_children(),
-                )
-
-        class Italic(MockBaseTag):
-            tag_name = 'i'
-
-            def _render(self):
-                ctx = self.get_context()
-                return '<i>{italic}. {children}</i>'.format(
-                    italic=ctx['i'],
-                    children=self.render_children()
-                )
-
-        class TestParser(tree_parser.BaseTreeParser):
-            tags = [Bold, Bold, Italic]
-            context_override = {
-                'b': 'bold',
-                'i': 'italic',
-            }
-
-        input_text = "[b][i]It's not a tumor![/i][/b]"
-        expected_text = "<b>bold. <i>italic. It's not a tumor!</i></b>"
-
-        inst = TestParser(input_text)
-        default_context = inst.get_context()
-        result_text = inst.render()
-        self.assertEqual(expected_text, result_text)
-        self.assertEqual(inst.get_context(), default_context)
 
     def test_context_updates(self):
         class Bold(MockBaseTag):
             tag_name = 'b'
+            context_override = {
+                'b': 'italic',
+            }
 
             def _render(self):
                 ctx = self.get_context()
@@ -714,17 +679,14 @@ class TestTreeParserContext(unittest.TestCase):
 
         class TestParser(tree_parser.BaseTreeParser):
             tags = [Bold, Italic]
-            context_override = {
-                'b': 'bold',
-                'i': 'italic',
-            }
 
         input_text = "[b][i]It's not a tumor![/i][/b]"
         expected_text = "<b>italic. <i>italic. It's not a tumor!</i></b>"
 
         inst = TestParser(input_text)
         result_text = inst.render(ctx={
-            'b': 'italic',
+            'b': 'bold',
+            'i': 'italic',
         })
 
         self.assertEqual(expected_text, result_text)
@@ -732,9 +694,8 @@ class TestTreeParserContext(unittest.TestCase):
     def test_context_tag_updates(self):
         class Bold(MockBaseTag):
             tag_name = 'b'
-            context_override = {
-                'b': 'gold',
-                'i': 'silver',
+            context_default = {
+                'b': 'BOLD',
             }
 
             def _render(self):
@@ -746,9 +707,8 @@ class TestTreeParserContext(unittest.TestCase):
 
         class Italic(MockBaseTag):
             tag_name = 'i'
-            context_override = {
-                'b': 'bronze',
-                'i': 'bronze',
+            context_default = {
+                'i': 'ITALIC',
             }
 
             def _render(self):
@@ -760,17 +720,13 @@ class TestTreeParserContext(unittest.TestCase):
 
         class TestParser(tree_parser.BaseTreeParser):
             tags = [Bold, Bold, Italic]
-            context_override = {
-                'b': 'bold',
-                'i': 'italic',
-            }
 
         input_text = "[b][i]It's not a tumor![/i][/b]"
-        expected_text = "<b>gold. <i>bronze. It's not a tumor!</i></b>"
+        expected_text = "<b>NOT BOLD. <i>ITALIC. It's not a tumor!</i></b>"
 
         inst = TestParser(input_text)
         result_text = inst.render(ctx={
-            'b': 'italic',
+            'b': 'NOT BOLD',
         })
 
         self.assertEqual(expected_text, result_text)

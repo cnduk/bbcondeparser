@@ -24,6 +24,36 @@ from . import _six as six
 from .utils import strip_newlines
 
 NEWLINE_STR = '\n'
+NEWLINE_BEHAVIOURS = {
+    None: 0,
+    'ignore': 1,
+    'remove': 2,
+}
+
+
+def apply_ctx(new_ctx, src_ctx):
+
+    for ctx_key, ctx_value in src_ctx.iteritems():
+        if ctx_key in new_ctx:
+            current_value = new_ctx[ctx_key]
+
+            if ctx_key == 'trim_whitespace':
+                if current_value is None:
+                    new_ctx[ctx_key] = ctx_value
+                elif ctx_value is False:
+                    new_ctx[ctx_key] = False
+
+            elif ctx_key == 'newline_behaviour':
+                if NEWLINE_BEHAVIOURS[ctx_value] > NEWLINE_BEHAVIOURS[current_value]:
+                    new_ctx[ctx_key] = ctx_value
+
+            else:
+                new_ctx[ctx_key] = ctx_value
+
+        else:
+            new_ctx[ctx_key] = ctx_value
+
+    return new_ctx
 
 
 class BaseNode(object):
@@ -31,43 +61,29 @@ class BaseNode(object):
     context_override = {}
 
     def __init__(self):
-        self._context = self.context_default.copy()
+        self._context = None
         self._parent_node = None
 
     def set_parent_node(self, parent_node):
         self._parent_node = parent_node
 
-    def _build_context(self, ctx=None):
-        if self._parent_node:
-            new_ctx = self._parent_node.get_context()
-            for default_key, default_value in self.context_default.iteritems():
-                if default_key not in new_ctx:
-                    new_ctx[default_key] = default_value
-
-        else:
-            new_ctx = self.context_default.copy()
-
-        if self.context_override:
-            new_ctx.update(self.context_override)
-
-        if ctx:
-            new_ctx.update(ctx)
-
-        self._context = new_ctx
-
-    def _reset_context(self):
-        self._context = self.context_default.copy()
-        self._context.update(self.context_override)
-
     def get_context(self):
+        if self._context is None:
+            # Defaults
+            new_ctx = self.context_default.copy()
+            # Inherit
+            if self._parent_node:
+                inherited_ctx = self._parent_node.get_context().copy()
+                new_ctx = apply_ctx(new_ctx, inherited_ctx)
+            # Override
+            new_ctx = apply_ctx(new_ctx, self.context_override)
+
+            self._context = new_ctx
+
         return self._context
 
     def render(self):
-        self._build_context()
-        rendered_stuff = self._render()
-        self._reset_context()
-
-        return rendered_stuff
+        return self._render()
 
     def _render(self):
         raise NotImplementedError
@@ -160,11 +176,23 @@ class BaseTagMeta(type):
 
     @staticmethod
     def validate_tag_cls(tag_cls):
-        pass
         # TODO `close_on_newline` vs `self_closing`
         # TODO `self_closing` vs `allowed_tags`
         # tag_name warning malformed?
         # category shouldbe TagCategory instance
+        if tag_cls.context_default:
+            newline_behaviour = tag_cls.context_default.get(
+                'newline_behaviour')
+            if newline_behaviour not in NEWLINE_BEHAVIOURS:
+                raise ValueError('newline_behaviour must be one of {}'.format(
+                    NEWLINE_BEHAVIOURS))
+
+        if tag_cls.context_override:
+            newline_behaviour = tag_cls.context_override.get(
+                'newline_behaviour')
+            if newline_behaviour not in NEWLINE_BEHAVIOURS:
+                raise ValueError('newline_behaviour must be one of {}'.format(
+                    NEWLINE_BEHAVIOURS))
 
 
 class TagCategory(object):
@@ -300,8 +328,8 @@ class BaseTag(BaseNode):
     attr_defs = {}
 
     context_default = {
-        'trim_whitespace': False,
-        'strip_newlines': False,
+        'newline_behaviour': None,
+        'trim_whitespace': None,
     }
 
     def __init__(self, attrs, tree, start_text, end_text):
@@ -378,16 +406,13 @@ class BaseTag(BaseNode):
         """
         text = super(BaseTag, self).render()
 
-        self._build_context()
         new_ctx = self.get_context()
 
-        if new_ctx.get('trim_whitespace', False):
+        if new_ctx.get('trim_whitespace'):
             text = text.strip()
 
-        if new_ctx.get('strip_newlines', False):
+        if new_ctx.get('newline_behaviour') == 'remove':
             text = strip_newlines(text)
-
-        self._reset_context()
 
         return text
 
@@ -448,11 +473,18 @@ class BaseTag(BaseNode):
 
 class RootTag(BaseTag):
 
+    def get_context(self, ctx=None):
+        if self._context is None or ctx:
+            new_ctx = super(RootTag, self).get_context()
+            if ctx:
+                new_ctx.update(ctx)
+            self._context = new_ctx
+
+        return self._context
+
     def render(self, ctx=None):
-        self._build_context(ctx=ctx)
-        rendered_tags = ''.join(tag.render() for tag in self.tree)
-        self._reset_context()
-        return rendered_tags
+        self.get_context(ctx=ctx)
+        return ''.join(tag.render() for tag in self.tree)
 
 
 class SimpleTag(BaseTag):

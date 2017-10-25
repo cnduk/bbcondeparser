@@ -50,9 +50,6 @@ class BaseTreeParser(object):
     newline_text_class = NewlineText
     root_tag_class = RootTag
 
-    context_default = {}
-    context_override = {}
-
     def __init__(self, text):
         self._context = {}
         self.raw_text = text
@@ -67,9 +64,6 @@ class BaseTreeParser(object):
             newline_text_class=self.newline_text_class,
             root_tag_class=self.root_tag_class,
         )
-        # Pass context_default and context_override to the root node
-        self.root_node.context_default = self.context_default
-        self.root_node.context_override = self.context_override
 
         # Update the root node parent to self
         self.root_node.set_parent_node(self)
