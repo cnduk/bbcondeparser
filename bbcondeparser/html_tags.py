@@ -412,15 +412,10 @@ def render_tree(parent_node):
             rendered_children.append(node.render())
 
         elif is_block_tag(node):
-
-            if is_inline_tag(parent_node):
-                rendered_children.append(node.render_raw())
-
-            else:
-                if convert_paragraphs and inside_paragraph:
-                    rendered_children.append('</p>')
-                    inside_paragraph = False
-                rendered_children.append(node.render())
+            if convert_paragraphs and inside_paragraph:
+                rendered_children.append('</p>')
+                inside_paragraph = False
+            rendered_children.append(node.render())
 
         elif isinstance(node, RENDERABLE_TEXT):
             if is_open_paragraph(node, convert_paragraphs, inside_paragraph):

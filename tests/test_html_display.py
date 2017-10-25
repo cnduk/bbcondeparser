@@ -409,7 +409,7 @@ class InlineTagTests(BaseTest):
         self._run_tests(
             DefaultParser,
             '[b]bold cant render [div]div[/div] tags[/b]',
-            '<strong>bold cant render [div]div[/div] tags</strong>',
+            '<strong>bold cant render div tags</strong>',
         )
 
 
