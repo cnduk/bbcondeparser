@@ -32,8 +32,8 @@ class BoldTag(HtmlSimpleTag):
     template = '<strong>{}</strong>'.format(HtmlSimpleTag.replace_text)
     tag_categories = [INLINE_TAGS, BASIC_TAGS, ALL_TAGS]
     allowed_tags = [INLINE_TAGS]
-    context_override = {
-        'convert_newlines': True,
+    context_default = {
+        'newline_behaviour': 'convert',
     }
 
 
@@ -43,8 +43,8 @@ class ItalicTag(HtmlSimpleTag):
     template = '<em>{}</em>'.format(HtmlSimpleTag.replace_text)
     tag_categories = [INLINE_TAGS, BASIC_TAGS, ALL_TAGS]
     allowed_tags = [INLINE_TAGS]
-    context_override = {
-        'convert_newlines': True,
+    context_default = {
+        'newline_behaviour': 'convert',
     }
 
 
@@ -89,8 +89,8 @@ class ListItemTag(BaseHTMLTag):
     tag_display = 'block'
     tag_categories = [LIST_TAGS]
     allowed_tags = [BASIC_TAGS]
-    context_override = {
-        'convert_newlines': True,
+    context_default = {
+        'newline_behaviour': 'convert',
     }
 
     def _render(self):
@@ -235,10 +235,9 @@ class DivTag(BaseHTMLTag):
     tag_name = 'div'
     tag_display = 'block'
     tag_categories = [ALL_TAGS]
-    context_override = {
-        'convert_newlines': True,
+    context_default = {
         'convert_paragraphs': True,
-        'strip_newlines': True,
+        'newline_behaviour': 'convert',
     }
 
     def _render(self):
@@ -255,15 +254,15 @@ class BaseDivTag(BaseHTMLTag):
 
 class NewlineTrueTag(BaseDivTag):
     tag_name = 'newline-true'
-    context_override = {
-        'convert_newlines': True,
+    context_default = {
+        'newline_behaviour': 'convert',
     }
 
 
 class NewlineFalseTag(BaseDivTag):
     tag_name = 'newline-false'
     context_override = {
-        'convert_newlines': False,
+        'newline_behaviour': 'ignore',
     }
 
 
@@ -273,7 +272,7 @@ class NewlineInheritTag(BaseDivTag):
 
 class ParagraphTrueTag(BaseDivTag):
     tag_name = 'paragraph-true'
-    context_override = {
+    context_default = {
         'convert_paragraphs': True,
     }
 
@@ -291,17 +290,15 @@ class ParagraphInheritTag(BaseDivTag):
 
 class StripNewlinesTrueTag(BaseDivTag):
     tag_name = 'stripnewlines-true'
-    context_override = {
-        'convert_newlines': False,
-        'strip_newlines': True,
+    context_default = {
+        'newline_behaviour': 'remove',
     }
 
 
 class StripNewlinesFalseTag(BaseDivTag):
     tag_name = 'stripnewlines-false'
-    context_override = {
-        'convert_newlines': False,
-        'strip_newlines': False,
+    context_default = {
+        'newline_behaviour': 'ignore',
     }
 
 
@@ -313,13 +310,16 @@ class DefaultParser(BaseHTMLRenderTreeParser):
     tags = [
         ALL_TAGS,
     ]
+    render_context = {
+        'newline_behaviour': 'ignore',
+    }
 
 
 class ParagraphParser(BaseHTMLRenderTreeParser):
     tags = [
         ALL_TAGS,
     ]
-    context_override = {
+    render_context = {
         'convert_paragraphs': True,
     }
 
@@ -328,8 +328,8 @@ class NewlineParser(BaseHTMLRenderTreeParser):
     tags = [
         ALL_TAGS,
     ]
-    context_override = {
-        'convert_newlines': True,
+    render_context = {
+        'newline_behaviour': 'convert',
     }
 
 
@@ -337,9 +337,9 @@ class ParagraphNewlinesParser(BaseHTMLRenderTreeParser):
     tags = [
         ALL_TAGS,
     ]
-    context_override = {
+    render_context = {
         'convert_paragraphs': True,
-        'convert_newlines': True,
+        'newline_behaviour': 'convert',
     }
 
 
@@ -347,8 +347,8 @@ class StripNewlinesParser(BaseHTMLRenderTreeParser):
     tags = [
         ALL_TAGS,
     ]
-    context_override = {
-        'strip_newlines': True,
+    render_context = {
+        'newline_behaviour': 'remove',
     }
 
 
@@ -356,9 +356,9 @@ class StripNewlinesNotParagraphsParser(BaseHTMLRenderTreeParser):
     tags = [
         ALL_TAGS,
     ]
-    context_override = {
+    render_context = {
         'convert_paragraphs': True,
-        'strip_newlines': True,
+        'newline_behaviour': 'remove',
     }
 
 
@@ -376,7 +376,8 @@ class RenderSelectedTagsParser(BaseHTMLRenderTreeParser):
 class BaseTest(unittest.TestCase):
     def _run_tests(self, baseparser, input_text, expected_output):
         parser = baseparser(input_text)
-        rendered_output = parser.render()
+        rendered_output = parser.render(
+            getattr(parser, 'render_context', None))
         self.assertEqual(
             expected_output,
             rendered_output,
@@ -418,21 +419,21 @@ class BlockTagTests(BaseTest):
         self._run_tests(
             DefaultParser,
             'text outside [div]text inside[/div] text outside',
-            'text outside <div>text inside</div> text outside',
+            'text outside <div><p>text inside</p></div> text outside',
         )
 
     def test_render_inline(self):
         self._run_tests(
             DefaultParser,
             'text outside [div][b]text[/b]\n[i]inside[/i][/div] text outside',
-            'text outside <div><strong>text</strong>\n<em>inside</em></div> text outside',
+            'text outside <div><p><strong>text</strong>\n<em>inside</em></p></div> text outside',
         )
 
     def test_render_blocks(self):
         self._run_tests(
             DefaultParser,
             'text outside [div]with another [div]div inside[/div][/div] text outside',
-            'text outside <div>with another <div>div inside</div></div> text outside',
+            'text outside <div><p>with another </p><div><p>div inside</p></div></div> text outside',
         )
 
 
@@ -595,7 +596,7 @@ class StripNewlinesTest(BaseTest):
         self._run_tests(
             StripNewlinesParser,
             'strip newlines here\n[stripnewlines-false]and also\n\n here[/stripnewlines-false]',
-            'strip newlines here<div>and also\n\n here</div>',
+            'strip newlines here<div>and also here</div>',
         )
 
     def test_inherit(self):
@@ -609,7 +610,7 @@ class StripNewlinesTest(BaseTest):
         self._run_tests(
             StripNewlinesParser,
             'strip newlines here\n[stripnewlines-inherit]and also\n\n here[stripnewlines-false][stripnewlines-inherit]these wont\n\n\n\n go[/stripnewlines-inherit][/stripnewlines-false][/stripnewlines-inherit]',
-            'strip newlines here<div>and also here<div><div>these wont\n\n\n\n go</div></div></div>',
+            'strip newlines here<div>and also here<div><div>these wont go</div></div></div>',
         )
 
 

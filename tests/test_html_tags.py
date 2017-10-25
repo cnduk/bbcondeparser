@@ -11,6 +11,5 @@ class TestBaseHTMLTagMeta(unittest.TestCase):
             class BadTag(html_tags.BaseHTMLTag):
                 tag_name = 'bad_tag'
                 context_default = {
-                    'strip_newlines': True,
-                    'convert_newlines': True,
+                    'newline_behaviour': 'butts',
                 }

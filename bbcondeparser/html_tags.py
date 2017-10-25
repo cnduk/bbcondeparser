@@ -29,6 +29,12 @@ from .tree_parser import BaseTreeParser
 
 
 HTML_NEWLINE = '<br />'
+NEWLINE_BEHAVIOURS = {
+    None: 0,
+    'convert': 1,
+    'ignore': 2,
+    'remove': 3,
+}
 RENDERABLE_TEXT = (ErrorText, RawText)
 
 
@@ -112,17 +118,24 @@ class BaseHTMLTagMeta(BaseTagMeta):
         Raises:
             RuntimeError: if some values are set and shouldnt
         """
-        BaseTagMeta.validate_tag_cls(tag_cls)
         ctx_default = tag_cls.context_default
+        ctx_override = tag_cls.context_override
 
-        if ctx_default.get('strip_newlines', False) is True\
-                and ctx_default.get('convert_newlines', False) is True:
-            raise RuntimeError(
-                "Cannot enable strip_newlines and convert_newlines"
-                " on {tag_cls.tag_name}".format(tag_cls=tag_cls))
+        newline_behaviour = ctx_default.get('newline_behaviour')
+        if newline_behaviour not in NEWLINE_BEHAVIOURS:
+            raise RuntimeError('newline_behaviour must be one of {}'.format(
+                NEWLINE_BEHAVIOURS))
+
+        newline_behaviour = ctx_override.get('newline_behaviour')
+        if newline_behaviour not in NEWLINE_BEHAVIOURS:
+            raise RuntimeError('newline_behaviour must be one of {}'.format(
+                NEWLINE_BEHAVIOURS))
 
         if is_inline_tag(tag_cls)\
-                and ctx_default.get('convert_paragraphs', False) is True:
+            and (
+                ctx_default.get('convert_paragraphs') is True
+                or ctx_override.get('convert_paragraphs') is True
+        ):
             raise RuntimeError(
                 "Cannot enable convert_paragraphs "
                 "on inline tag {tag_cls.tag_name}".format(tag_cls=tag_cls))
@@ -133,22 +146,29 @@ class BaseHTMLTagMeta(BaseTagMeta):
                 "on {tag_cls.tag_name}".format(tag_cls=tag_cls))
 
 
-def add_missing_keys(dst, src):
-    for src_key, src_value in src.iteritems():
-        if src_key not in dst:
-            dst[src_key] = src_value
-    return dst
+def apply_ctx(new_ctx, src_ctx):
 
+    for ctx_key, ctx_value in src_ctx.iteritems():
+        if ctx_key in new_ctx:
+            current_value = new_ctx[ctx_key]
 
-def update_dict(dst, src):
-    for key, value in src.iteritems():
-        if key in dst:
-            if value is False:
-                dst[key] = False
+            if ctx_key in ('convert_paragraphs', 'trim_whitespace'):
+                if current_value is None:
+                    new_ctx[ctx_key] = ctx_value
+                elif ctx_value is False:
+                    new_ctx[ctx_key] = False
+
+            elif ctx_key == 'newline_behaviour':
+                if NEWLINE_BEHAVIOURS[ctx_value] > NEWLINE_BEHAVIOURS[current_value]:
+                    new_ctx[ctx_key] = ctx_value
+
+            else:
+                new_ctx[ctx_key] = ctx_value
+
         else:
-            dst[key] = value
+            new_ctx[ctx_key] = ctx_value
 
-    return dst
+    return new_ctx
 
 
 @six.add_metaclass(BaseHTMLTagMeta)
@@ -165,9 +185,9 @@ class BaseHTMLTag(BaseTag):
 
     tag_display = 'inline'
     context_default = {
-        'convert_newlines': False,
-        'convert_paragraphs': False,
-        'strip_newlines': False,
+        'newline_behaviour': None,
+        'convert_paragraphs': None,
+        'trim_whitespace': None,
     }
     context_override = {}
 
@@ -206,37 +226,30 @@ class BaseHTMLTag(BaseTag):
         # Return the last defined
         return items[-1][1]
 
-    def _build_context(self, ctx=None):
+    def get_context(self):
+        if self._context is None:
+            # Defaults
+            new_ctx = self.context_default.copy()
+            # Inherit
+            if self._parent_node:
+                inherited_ctx = self._parent_node.get_context().copy()
+                new_ctx = apply_ctx(new_ctx, inherited_ctx)
+            # Override
+            new_ctx = apply_ctx(new_ctx, self.context_override)
 
-        if not self._parent_node:
-            new_ctx = self.context_override.copy()
-            new_ctx = add_missing_keys(new_ctx, self.context_default)
+            # Anything that is not a block tag must not render paragraphs
+            if is_inline_tag(self):
+                new_ctx['convert_paragraphs'] = False
 
-        else:
-            new_ctx = self._parent_node.get_context().copy()
-            new_ctx = update_dict(new_ctx, self.context_override)
-            new_ctx = add_missing_keys(new_ctx, self.context_default)
+            self._context = new_ctx
 
-        if ctx:
-            new_ctx = update_dict(new_ctx, ctx)
+        return self._context
 
-        # Anything that is not a block tag must not render paragraphs
-        if is_inline_tag(self):
-            new_ctx['convert_paragraphs'] = False
-
-        self._context = new_ctx
-
-    def _reset_context(self):
-        new_ctx = self.context_override.copy()
-        self._context = add_missing_keys(new_ctx, self.context_default)
-
-    def render(self, ctx=None):
+    def render(self):
         """Return the rendering of this tag (including children)
             (N.B. This inherintly includes children, no way not to.
         """
-        self._build_context()
         child_text = self._render()
-        self._reset_context()
 
         if self.get_context().get('trim_whitespace', False):
             child_text = child_text.strip()
@@ -249,10 +262,19 @@ class BaseHTMLTag(BaseTag):
 
 class RootHTMLTag(RootTag):
     context_default = {
-        'convert_newlines': False,
-        'convert_paragraphs': False,
-        'strip_newlines': False,
+        'convert_paragraphs': None,
+        'newline_behaviour': None,
+        'trim_whitespace': None,
     }
+
+    def get_context(self, ctx=None):
+        if self._context is None or ctx:
+            new_ctx = super(RootHTMLTag, self).get_context()
+            if ctx:
+                new_ctx.update(ctx)
+            self._context = new_ctx
+
+        return self._context
 
     def render(self, ctx=None):
         """Render the tag.
@@ -260,10 +282,8 @@ class RootHTMLTag(RootTag):
         Returns:
             str: the rendered tag
         """
-        self._build_context(ctx=ctx)
-        child_text = render_tree(self)
-        self._reset_context()
-        return child_text
+        self.get_context(ctx=ctx)
+        return render_tree(self)
 
 
 class HtmlSimpleTag(BaseHTMLTag):
@@ -337,11 +357,6 @@ class BaseHTMLRenderTreeParser(BaseTreeParser):
     raw_text_class = HTMLText
     newline_text_class = HTMLNewlineText
     root_tag_class = RootHTMLTag
-    context_default = {
-        'convert_newlines': False,
-        'convert_paragraphs': False,
-        'strip_newlines': False,
-    }
 
 
 def peek_node(tree, node_index):
@@ -385,8 +400,8 @@ def render_tree(parent_node):
     tree = parent_node.tree
     parent_ctx = parent_node.get_context()
     convert_paragraphs = parent_ctx.get('convert_paragraphs', False)
-    convert_newlines = parent_ctx.get('convert_newlines', False)
-    strip_newlines = parent_ctx.get('strip_newlines', False)
+    convert_newlines = parent_ctx.get('newline_behaviour') == 'convert'
+    strip_newlines = parent_ctx.get('newline_behaviour') == 'remove'
 
     for node_index, node in enumerate(tree):
 
