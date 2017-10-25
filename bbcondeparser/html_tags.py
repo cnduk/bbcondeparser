@@ -294,10 +294,11 @@ class HtmlSimpleTag(BaseHTMLTag):
         template (str): basic template
     """
 
-    convert_newlines = False
-    convert_paragraphs = False
     template = None
     replace_text = '{{ body }}'
+    context_override = {
+        'convert_paragraphs': False,
+    }
 
     def _render(self):
         rendered_children = self.render_children()
