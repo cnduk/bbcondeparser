@@ -36,7 +36,6 @@ from bbcondeparser.tags import (
     RawText,
     NewlineText,
     parse_tag_set,
-    BaseNode,
     RootTag,
 )
 
@@ -77,9 +76,9 @@ class BaseTreeParser(object):
         return self._context
 
     def render(self, ctx=None):
-        # First node in tree is always a root node so we can pass the context
-        # to that node.
-        return self.root_node.render(ctx=ctx)
+        if ctx:
+            self._context = ctx
+        return self.root_node.render()
 
     def pretty_format(self):
         return self.root_node.pretty_format()
