@@ -32,9 +32,7 @@ class BoldTag(HtmlSimpleTag):
     template = '<strong>{}</strong>'.format(HtmlSimpleTag.replace_text)
     tag_categories = [INLINE_TAGS, BASIC_TAGS, ALL_TAGS]
     allowed_tags = [INLINE_TAGS]
-    context_default = {
-        'newline_behaviour': 'convert',
-    }
+    newline_behaviour = 'convert'
 
 
 
@@ -43,9 +41,7 @@ class ItalicTag(HtmlSimpleTag):
     template = '<em>{}</em>'.format(HtmlSimpleTag.replace_text)
     tag_categories = [INLINE_TAGS, BASIC_TAGS, ALL_TAGS]
     allowed_tags = [INLINE_TAGS]
-    context_default = {
-        'newline_behaviour': 'convert',
-    }
+    newline_behaviour = 'convert'
 
 
 class ImageTag(BaseHTMLTag):
@@ -89,9 +85,7 @@ class ListItemTag(BaseHTMLTag):
     tag_display = 'block'
     tag_categories = [LIST_TAGS]
     allowed_tags = [BASIC_TAGS]
-    context_default = {
-        'newline_behaviour': 'convert',
-    }
+    newline_behaviour = 'convert'
 
     def _render(self):
         return '<li>{children}</li>'.format(
@@ -235,10 +229,8 @@ class DivTag(BaseHTMLTag):
     tag_name = 'div'
     tag_display = 'block'
     tag_categories = [ALL_TAGS]
-    context_default = {
-        'convert_paragraphs': True,
-        'newline_behaviour': 'convert',
-    }
+    convert_paragraphs = True
+    newline_behaviour = 'convert'
 
     def _render(self):
         return '<div>{children}</div>'.format(children=self.render_children())
@@ -254,16 +246,12 @@ class BaseDivTag(BaseHTMLTag):
 
 class NewlineTrueTag(BaseDivTag):
     tag_name = 'newline-true'
-    context_default = {
-        'newline_behaviour': 'convert',
-    }
+    newline_behaviour = 'convert'
 
 
 class NewlineFalseTag(BaseDivTag):
     tag_name = 'newline-false'
-    context_override = {
-        'newline_behaviour': 'ignore',
-    }
+    newline_behaviour = 'ignore'
 
 
 class NewlineInheritTag(BaseDivTag):
@@ -272,16 +260,12 @@ class NewlineInheritTag(BaseDivTag):
 
 class ParagraphTrueTag(BaseDivTag):
     tag_name = 'paragraph-true'
-    context_default = {
-        'convert_paragraphs': True,
-    }
+    convert_paragraphs = True
 
 
 class ParagraphFalseTag(BaseDivTag):
     tag_name = 'paragraph-false'
-    context_override = {
-        'convert_paragraphs': False,
-    }
+    convert_paragraphs = False
 
 
 class ParagraphInheritTag(BaseDivTag):
@@ -290,16 +274,12 @@ class ParagraphInheritTag(BaseDivTag):
 
 class StripNewlinesTrueTag(BaseDivTag):
     tag_name = 'stripnewlines-true'
-    context_default = {
-        'newline_behaviour': 'remove',
-    }
+    newline_behaviour = 'remove'
 
 
 class StripNewlinesFalseTag(BaseDivTag):
     tag_name = 'stripnewlines-false'
-    context_default = {
-        'newline_behaviour': 'ignore',
-    }
+    newline_behaviour = 'ignore'
 
 
 class StripNewlinesInheritTag(BaseDivTag):
@@ -310,56 +290,44 @@ class DefaultParser(BaseHTMLRenderTreeParser):
     tags = [
         ALL_TAGS,
     ]
-    render_context = {
-        'newline_behaviour': 'ignore',
-    }
+    newline_behaviour = 'ignore'
 
 
 class ParagraphParser(BaseHTMLRenderTreeParser):
     tags = [
         ALL_TAGS,
     ]
-    render_context = {
-        'convert_paragraphs': True,
-    }
+    convert_paragraphs = True
 
 
 class NewlineParser(BaseHTMLRenderTreeParser):
     tags = [
         ALL_TAGS,
     ]
-    render_context = {
-        'newline_behaviour': 'convert',
-    }
+    newline_behaviour = 'convert'
 
 
 class ParagraphNewlinesParser(BaseHTMLRenderTreeParser):
     tags = [
         ALL_TAGS,
     ]
-    render_context = {
-        'convert_paragraphs': True,
-        'newline_behaviour': 'convert',
-    }
+    convert_paragraphs = True
+    newline_behaviour = 'convert'
 
 
 class StripNewlinesParser(BaseHTMLRenderTreeParser):
     tags = [
         ALL_TAGS,
     ]
-    render_context = {
-        'newline_behaviour': 'remove',
-    }
+    newline_behaviour = 'remove'
 
 
 class StripNewlinesNotParagraphsParser(BaseHTMLRenderTreeParser):
     tags = [
         ALL_TAGS,
     ]
-    render_context = {
-        'convert_paragraphs': True,
-        'newline_behaviour': 'remove',
-    }
+    convert_paragraphs = True
+    newline_behaviour = 'remove'
 
 
 class RenderSelectedTagsParser(BaseHTMLRenderTreeParser):

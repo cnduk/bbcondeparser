@@ -118,24 +118,12 @@ class BaseHTMLTagMeta(BaseTagMeta):
         Raises:
             RuntimeError: if some values are set and shouldnt
         """
-        ctx_default = tag_cls.context_default
-        ctx_override = tag_cls.context_override
 
-        newline_behaviour = ctx_default.get('newline_behaviour')
-        if newline_behaviour not in NEWLINE_BEHAVIOURS:
+        if tag_cls.newline_behaviour not in NEWLINE_BEHAVIOURS:
             raise RuntimeError('newline_behaviour must be one of {}'.format(
                 NEWLINE_BEHAVIOURS))
 
-        newline_behaviour = ctx_override.get('newline_behaviour')
-        if newline_behaviour not in NEWLINE_BEHAVIOURS:
-            raise RuntimeError('newline_behaviour must be one of {}'.format(
-                NEWLINE_BEHAVIOURS))
-
-        if is_inline_tag(tag_cls)\
-            and (
-                ctx_default.get('convert_paragraphs') is True
-                or ctx_override.get('convert_paragraphs') is True
-        ):
+        if is_inline_tag(tag_cls) and tag_cls.convert_paragraphs:
             raise RuntimeError(
                 "Cannot enable convert_paragraphs "
                 "on inline tag {tag_cls.tag_name}".format(tag_cls=tag_cls))
@@ -184,12 +172,9 @@ class BaseHTMLTag(BaseTag):
     """
 
     tag_display = 'inline'
-    context_default = {
-        'newline_behaviour': None,
-        'convert_paragraphs': None,
-        'trim_whitespace': None,
-    }
-    context_override = {}
+    newline_behaviour = None
+    convert_paragraphs = None
+    trim_whitespace = None
 
     def find_children_instances(self, cls, multi=True):
         """This method searches immediate children for instances of `cls`
@@ -226,64 +211,22 @@ class BaseHTMLTag(BaseTag):
         # Return the last defined
         return items[-1][1]
 
-    def get_context(self):
-        if self._context is None:
-            # Defaults
-            new_ctx = self.context_default.copy()
-            # Inherit
-            if self._parent_node:
-                inherited_ctx = self._parent_node.get_context().copy()
-                new_ctx = apply_ctx(new_ctx, inherited_ctx)
-            # Override
-            new_ctx = apply_ctx(new_ctx, self.context_override)
-
-            # Anything that is not a block tag must not render paragraphs
-            if is_inline_tag(self):
-                new_ctx['convert_paragraphs'] = False
-
-            self._context = new_ctx
-
-        return self._context
-
     def render(self):
         """Return the rendering of this tag (including children)
             (N.B. This inherintly includes children, no way not to.
         """
         child_text = self._render()
 
-        if self.get_context().get('trim_whitespace', False):
+        if self.trim_whitespace:
             child_text = child_text.strip()
 
         return child_text
 
-    def render_children(self):
-        return render_tree(self)
-
 
 class RootHTMLTag(RootTag):
-    context_default = {
-        'convert_paragraphs': None,
-        'newline_behaviour': None,
-        'trim_whitespace': None,
-    }
-
-    def get_context(self, ctx=None):
-        if self._context is None or ctx:
-            new_ctx = super(RootHTMLTag, self).get_context()
-            if ctx:
-                new_ctx.update(ctx)
-            self._context = new_ctx
-
-        return self._context
-
-    def render(self, ctx=None):
-        """Render the tag.
-
-        Returns:
-            str: the rendered tag
-        """
-        self.get_context(ctx=ctx)
-        return render_tree(self)
+    newline_behaviour = None
+    convert_paragraphs = None
+    trim_whitespace = None
 
 
 class HtmlSimpleTag(BaseHTMLTag):
@@ -296,9 +239,7 @@ class HtmlSimpleTag(BaseHTMLTag):
 
     template = None
     replace_text = '{{ body }}'
-    context_override = {
-        'convert_paragraphs': False,
-    }
+    convert_paragraphs = False
 
     def _render(self):
         rendered_children = self.render_children()
@@ -308,6 +249,16 @@ class HtmlSimpleTag(BaseHTMLTag):
 
         else:
             return self.template.replace(self.replace_text, rendered_children)
+
+
+class ParagraphTag(BaseHTMLTag):
+    tag_name = 'p'
+    # It is block but has the behaviour of an inline
+    tag_display = 'inline'
+    convert_paragraphs = False
+
+    def _render(self):
+        return '<p>{children}</p>'.format(children=self.render_children())
 
 
 class BaseHTMLRenderTreeParser(BaseTreeParser):
@@ -358,108 +309,139 @@ class BaseHTMLRenderTreeParser(BaseTreeParser):
     raw_text_class = HTMLText
     newline_text_class = HTMLNewlineText
     root_tag_class = RootHTMLTag
+    newline_behaviour = None
+    convert_paragraphs = None
 
+    def __init__(self, text, newline_behaviour=None, convert_paragraphs=None):
+        super(BaseHTMLRenderTreeParser, self).__init__(text)
 
-def peek_node(tree, node_index):
-    """Have a cheeky look at the next node in the tree.
+        self.root_node.newline_behaviour = newline_behaviour or self.newline_behaviour
+        self.root_node.convert_paragraphs = convert_paragraphs or self.convert_paragraphs
+        self._parse_tree()
 
-    Args:
-        tree (list): list of nodes
-        node_index (int): node index to look at
+    def _parse_tree(self):
 
-    Returns:
-        Tag, False: found tag or False if nothing is found
-    """
-    try:
-        return tree[node_index]
-    except IndexError:
-        return False
+        scope_stack = [{}]
 
+        def push_scope(node):
+            new_scope = apply_ctx(get_scope().copy(), {
+                'convert_paragraphs': node.convert_paragraphs,
+                'newline_behaviour': node.newline_behaviour,
+            })
+            scope_stack.append(new_scope)
 
-def is_open_paragraph(node, convert_paragraphs, inside_paragraph):
-    return node\
-        and (is_inline_tag(node) or isinstance(node, RENDERABLE_TEXT))\
-        and convert_paragraphs\
-        and not inside_paragraph
+        def pop_scope():
+            scope_stack.pop()
 
+        def get_scope():
+            return scope_stack[-1]
 
-def render_tree(parent_node):
-    """Render the tree of tags.
+        def _parse_node(parsed_node):
 
-    Args:
-        tree (list): list of tags
-        convert_newlines (bool, optional): whether to convert newlines
-        convert_paragraphs (bool, optional): whether to convert paragraphs
-        strip_newlines (bool, optional): whether to strip newlines
+            push_scope(parsed_node)
 
-    Returns:
-        str: rendered children
-    """
-    rendered_children = []
-    inside_paragraph = False
+            scope = get_scope()
+            convert_paragraphs = scope['convert_paragraphs'] is True
+            remove_newlines = scope['newline_behaviour'] == 'remove'
+            convert_newlines = scope['newline_behaviour'] == 'convert'
 
-    tree = parent_node.tree
-    parent_ctx = parent_node.get_context()
-    convert_paragraphs = parent_ctx.get('convert_paragraphs', False)
-    convert_newlines = parent_ctx.get('newline_behaviour') == 'convert'
-    strip_newlines = parent_ctx.get('newline_behaviour') == 'remove'
+            new_tree = []
+            paragraph_scope = None
+            inside_paragraph = False
 
-    for node_index, node in enumerate(tree):
+            for node_index, node in enumerate(parsed_node.tree):
 
-        if is_inline_tag(node):
-            if is_open_paragraph(node, convert_paragraphs, inside_paragraph):
-                rendered_children.append('<p>')
-                inside_paragraph = True
-            rendered_children.append(node.render())
+                if is_inline_tag(node):
 
-        elif is_block_tag(node):
-            if convert_paragraphs and inside_paragraph:
-                rendered_children.append('</p>')
-                inside_paragraph = False
-            rendered_children.append(node.render())
+                    node.tree = _parse_node(node)
 
-        elif isinstance(node, RENDERABLE_TEXT):
-            if is_open_paragraph(node, convert_paragraphs, inside_paragraph):
-                rendered_children.append('<p>')
-                inside_paragraph = True
-            rendered_children.append(node.render())
+                    if convert_paragraphs:
+                        if not inside_paragraph:
+                            inside_paragraph = True
+                            paragraph_scope = [node]
+                        else:
+                            paragraph_scope.append(node)
+                    else:
+                        new_tree.append(node)
 
-        elif isinstance(node, NewlineText):
-            if node.count > 1:
-                if convert_paragraphs:
-                    if inside_paragraph:
-                        rendered_children.append('</p>')
+                elif is_block_tag(node):
+
+                    if inside_paragraph and paragraph_scope:
+                        # clone paragraph scope?
+                        paragraph_node = ParagraphTag(
+                            {}, paragraph_scope, '', '')
+                        new_tree.append(paragraph_node)
+                        paragraph_scope = None
                         inside_paragraph = False
 
-                    next_node = peek_node(tree, node_index + 1)
-                    if next_node and not is_block_tag(next_node):
-                        rendered_children.append('<p>')
-                        inside_paragraph = True
+                    node.tree = _parse_node(node)
+                    new_tree.append(node)
 
-                    elif not strip_newlines:
-                        rendered_children.append(node.render_raw())
+                elif isinstance(node, RENDERABLE_TEXT):
 
-                elif convert_newlines:
-                    rendered_children.append(node.render())
+                    if convert_paragraphs:
+                        if not inside_paragraph:
+                            inside_paragraph = True
+                            paragraph_scope = [node]
+                        else:
+                            paragraph_scope.append(node)
 
-                elif not strip_newlines:
-                    rendered_children.append(node.render_raw())
+                    else:
+                        new_tree.append(node)
 
-            else:
-                next_node = peek_node(tree, node_index + 1)
-                if convert_newlines:
-                    if not is_open_paragraph(
-                            next_node, convert_paragraphs, inside_paragraph):
-                        rendered_children.append(node.render())
+                elif isinstance(node, NewlineText):
 
-                    elif not strip_newlines:
-                        rendered_children.append(node.render_raw())
+                    # Open/close a paragraph
+                    if node.count >= 2 and convert_paragraphs:
 
-                elif not strip_newlines:
-                    rendered_children.append(node.render_raw())
+                        # Close paragraph, wrap in tag, add as node
+                        if inside_paragraph and paragraph_scope:
+                            # clone paragraph scope?
+                            paragraph_node = ParagraphTag(
+                                {}, paragraph_scope, '', '')
+                            new_tree.append(paragraph_node)
+                            paragraph_scope = None
+                            inside_paragraph = False
 
-    if convert_paragraphs and inside_paragraph:
-        rendered_children.append('</p>')
-        inside_paragraph = False
+                        # Open paragraph and scope. Dont need to add node.
+                        else:
+                            inside_paragraph = True
+                            paragraph_scope = []
 
-    return ''.join(rendered_children)
+                    else:
+                        if convert_newlines:
+                            # we dont want to put <br/> in between blocks so
+                            # we actually only want to put them in paragraphs
+                            # if we're converting or anywhere if we're not
+                            # converting paragraphs
+                            if inside_paragraph:
+                                paragraph_scope.append(node)
+                            elif not convert_paragraphs:
+                                new_tree.append(node)
+                            else:
+                                # Not removing and not converting so change
+                                # back to NewlineText
+                                new_node = NewlineText(node.text)
+                                new_node.count = node.count
+                                new_tree.append(new_node)
+
+                        elif not remove_newlines:
+                            # Not removing and not converting so change back
+                            # to NewlineText
+                            new_node = NewlineText(node.text)
+                            new_node.count = node.count
+                            if inside_paragraph:
+                                paragraph_scope.append(new_node)
+                            else:
+                                new_tree.append(new_node)
+
+            if inside_paragraph and paragraph_scope:
+                paragraph_node = ParagraphTag({}, paragraph_scope, '', '')
+                new_tree.append(paragraph_node)
+                paragraph_scope = None
+                inside_paragraph = False
+
+            pop_scope()
+            return new_tree
+
+        self.root_node.tree = _parse_node(self.root_node)

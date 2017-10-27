@@ -10,6 +10,4 @@ class TestBaseHTMLTagMeta(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             class BadTag(html_tags.BaseHTMLTag):
                 tag_name = 'bad_tag'
-                context_default = {
-                    'newline_behaviour': 'butts',
-                }
+                newline_behaviour = 'butts'
