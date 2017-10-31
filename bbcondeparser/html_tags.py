@@ -20,6 +20,7 @@
 # SOFTWARE.
 
 import cgi
+from collections import namedtuple
 
 from . import _six as six
 
@@ -134,21 +135,43 @@ class BaseHTMLTagMeta(BaseTagMeta):
                 "on {tag_cls.tag_name}".format(tag_cls=tag_cls))
 
 
+def get_newline_behaviour(current_value, new_value):
+    if NEWLINE_BEHAVIOURS[new_value] > NEWLINE_BEHAVIOURS[current_value]:
+        return new_value
+    else:
+        return current_value
+
+
+def get_convert_paragraphs(current_value, new_value):
+    if current_value is None:
+        return new_value
+    elif new_value is False:
+        return new_value
+    else:
+        return current_value
+
+
+def get_trim_whitespace(current_value, new_value):
+    return get_convert_paragraphs(current_value, new_value)
+
+
 def apply_ctx(new_ctx, src_ctx):
 
     for ctx_key, ctx_value in src_ctx.iteritems():
         if ctx_key in new_ctx:
             current_value = new_ctx[ctx_key]
 
-            if ctx_key in ('convert_paragraphs', 'trim_whitespace'):
-                if current_value is None:
-                    new_ctx[ctx_key] = ctx_value
-                elif ctx_value is False:
-                    new_ctx[ctx_key] = False
+            if ctx_key == 'convert_paragraphs':
+                new_ctx[ctx_key] = get_convert_paragraphs(
+                    current_value, ctx_value)
+
+            elif ctx_key == 'trim_whitespace':
+                new_ctx[ctx_key] = get_trim_whitespace(
+                    current_value, ctx_value)
 
             elif ctx_key == 'newline_behaviour':
-                if NEWLINE_BEHAVIOURS[ctx_value] > NEWLINE_BEHAVIOURS[current_value]:
-                    new_ctx[ctx_key] = ctx_value
+                new_ctx[ctx_key] = get_newline_behaviour(
+                    current_value, ctx_value)
 
             else:
                 new_ctx[ctx_key] = ctx_value
@@ -221,6 +244,15 @@ class BaseHTMLTag(BaseTag):
             child_text = child_text.strip()
 
         return child_text
+
+    def get_context(self):
+        return apply_ctx(
+            super(BaseHTMLTag, self).get_context().copy(),
+            {
+                'newline_behaviour': self.newline_behaviour,
+                'convert_paragraphs': self.convert_paragraphs,
+            },
+        )
 
 
 class RootHTMLTag(RootTag):
@@ -315,133 +347,229 @@ class BaseHTMLRenderTreeParser(BaseTreeParser):
     def __init__(self, text, newline_behaviour=None, convert_paragraphs=None):
         super(BaseHTMLRenderTreeParser, self).__init__(text)
 
-        self.root_node.newline_behaviour = newline_behaviour or self.newline_behaviour
-        self.root_node.convert_paragraphs = convert_paragraphs or self.convert_paragraphs
-        self._parse_tree()
+        newline_behaviour = get_newline_behaviour(
+            self.newline_behaviour, newline_behaviour)
+        convert_paragraphs = get_convert_paragraphs(
+            self.convert_paragraphs, convert_paragraphs)
 
-    def _parse_tree(self):
+        self.root_node = amend_tree(
+            self.root_node, newline_behaviour, convert_paragraphs)
 
-        scope_stack = [{}]
 
-        def push_scope(node):
-            new_scope = apply_ctx(get_scope().copy(), {
-                'convert_paragraphs': node.convert_paragraphs,
-                'newline_behaviour': node.newline_behaviour,
-            })
-            scope_stack.append(new_scope)
+def amend_tree(root_node, newline_behaviour=None, convert_paragraphs=None):
+    inst = _BaseHTMLRenderTreeParser(
+        root_node, newline_behaviour, convert_paragraphs)
+    inst.amend_tree()
+    return inst.root_node
 
-        def pop_scope():
-            scope_stack.pop()
 
-        def get_scope():
-            return scope_stack[-1]
+StackLevel = namedtuple(
+    'TreeParserStackLevel',
+    ['tree', 'node', 'paragraph_tree', 'inside_paragraph', 'newline_behaviour',
+        'convert_paragraphs']
+)
 
-        def _parse_node(parsed_node):
 
-            push_scope(parsed_node)
+class NodeStack(object):
 
-            scope = get_scope()
-            convert_paragraphs = scope['convert_paragraphs'] is True
-            remove_newlines = scope['newline_behaviour'] == 'remove'
-            convert_newlines = scope['newline_behaviour'] == 'convert'
+    def __init__(self):
+        self.stack = []
 
-            new_tree = []
-            paragraph_scope = None
-            inside_paragraph = False
+    def __bool__(self):
+        return len(self) > 0
 
-            for node_index, node in enumerate(parsed_node.tree):
+    __nonzero__ = __bool__
 
-                if is_inline_tag(node):
+    def __len__(self):
+        return len(self.stack)
 
-                    node.tree = _parse_node(node)
+    def __getitem__(self, index):
+        return self.stack[index]
 
-                    if convert_paragraphs:
-                        if not inside_paragraph:
-                            inside_paragraph = True
-                            paragraph_scope = [node]
-                        else:
-                            paragraph_scope.append(node)
-                    else:
-                        new_tree.append(node)
+    def pop(self):
+        return self.stack.pop()
 
-                elif is_block_tag(node):
+    def push(self, *args, **kwargs):
+        item = StackLevel(*args, **kwargs)
+        self.stack.append(item)
 
-                    if inside_paragraph and paragraph_scope:
-                        # clone paragraph scope?
-                        paragraph_node = ParagraphTag(
-                            {}, paragraph_scope, '', '')
-                        new_tree.append(paragraph_node)
-                        paragraph_scope = None
-                        inside_paragraph = False
 
-                    node.tree = _parse_node(node)
-                    new_tree.append(node)
+class _BaseHTMLRenderTreeParser(object):
 
-                elif isinstance(node, RENDERABLE_TEXT):
+    def __init__(self, root_node, newline_behaviour=None,
+                 convert_paragraphs=None):
 
-                    if convert_paragraphs:
-                        if not inside_paragraph:
-                            inside_paragraph = True
-                            paragraph_scope = [node]
-                        else:
-                            paragraph_scope.append(node)
+        self.root_node = root_node
+        self.stack = NodeStack()
+        self.newline_behaviour = newline_behaviour
+        self.convert_paragraphs = convert_paragraphs
 
-                    else:
-                        new_tree.append(node)
+        self._inside_paragraph = False
+        self._paragraph_tree = None
+        self._tree = []
+        self._node = None
 
-                elif isinstance(node, NewlineText):
+    def append_tree(self, item):
+        self._tree.append(item)
 
-                    # Open/close a paragraph
-                    if node.count >= 2 and convert_paragraphs:
+    def append_paragraph(self, item):
+        self._paragraph_tree.append(item)
 
-                        # Close paragraph, wrap in tag, add as node
-                        if inside_paragraph and paragraph_scope:
-                            # clone paragraph scope?
-                            paragraph_node = ParagraphTag(
-                                {}, paragraph_scope, '', '')
-                            new_tree.append(paragraph_node)
-                            paragraph_scope = None
-                            inside_paragraph = False
+    def stack_push(self):
+        self.stack.push(
+            self._tree, self._node, self._paragraph_tree,
+            self._inside_paragraph, self.newline_behaviour,
+            self.convert_paragraphs,
+        )
+        self._tree = []
+        # self._node = None
+        self._paragraph_tree = None
+        self._inside_paragraph = False
+        ctx = self._node.get_context()
+        self.newline_behaviour = get_newline_behaviour(
+            self.newline_behaviour, ctx.get('newline_behaviour'))
+        self.convert_paragraphs = get_convert_paragraphs(
+            self.convert_paragraphs, ctx.get('convert_paragraphs'))
 
-                        # Open paragraph and scope. Dont need to add node.
-                        else:
-                            inside_paragraph = True
-                            paragraph_scope = []
+    def stack_pop(self):
+        self.set_state(self.stack.pop())
 
-                    else:
-                        if convert_newlines:
-                            # we dont want to put <br/> in between blocks so
-                            # we actually only want to put them in paragraphs
-                            # if we're converting or anywhere if we're not
-                            # converting paragraphs
-                            if inside_paragraph:
-                                paragraph_scope.append(node)
-                            elif not convert_paragraphs:
-                                new_tree.append(node)
-                            else:
-                                # Not removing and not converting so change
-                                # back to NewlineText
-                                new_node = NewlineText(node.text)
-                                new_node.count = node.count
-                                new_tree.append(new_node)
+    def set_state(self, stack_ctx):
+        self._tree = stack_ctx.tree
+        self._node = stack_ctx.node
+        self._paragraph_tree = stack_ctx.paragraph_tree
+        self._inside_paragraph = stack_ctx.inside_paragraph
+        self.newline_behaviour = stack_ctx.newline_behaviour
+        self.convert_paragraphs = stack_ctx.convert_paragraphs
 
-                        elif not remove_newlines:
-                            # Not removing and not converting so change back
-                            # to NewlineText
-                            new_node = NewlineText(node.text)
-                            new_node.count = node.count
-                            if inside_paragraph:
-                                paragraph_scope.append(new_node)
-                            else:
-                                new_tree.append(new_node)
+    @property
+    def is_converting_paragraphs(self):
+        return self.convert_paragraphs is True
 
-            if inside_paragraph and paragraph_scope:
-                paragraph_node = ParagraphTag({}, paragraph_scope, '', '')
-                new_tree.append(paragraph_node)
-                paragraph_scope = None
-                inside_paragraph = False
+    @property
+    def is_removing_newlines(self):
+        return self.newline_behaviour == 'remove'
 
-            pop_scope()
-            return new_tree
+    @property
+    def is_converting_newlines(self):
+        return self.newline_behaviour == 'convert'
 
-        self.root_node.tree = _parse_node(self.root_node)
+    @property
+    def is_inside_paragraph(self):
+        return self._inside_paragraph is True
+
+    def open_paragraph(self, include_node=True):
+        self._inside_paragraph = True
+        if include_node:
+            self._paragraph_tree = [self._node]
+        else:
+            self._paragraph_tree = []
+
+    def close_paragraph(self):
+        # clone paragraph scope?
+        paragraph_node = ParagraphTag({}, self._paragraph_tree, '', '')
+        self.append_tree(paragraph_node)
+        self._paragraph_tree = None
+        self._inside_paragraph = False
+
+    def handle_inline_tag(self):
+        self.handle_tree()
+
+        if self.is_converting_paragraphs:
+            if not self.is_inside_paragraph:
+                self.open_paragraph()
+            else:
+                self.append_paragraph(self._node)
+
+        else:
+            self.append_tree(self._node)
+
+    def handle_block_tag(self):
+        if self.is_inside_paragraph and self._paragraph_tree:
+            self.close_paragraph()
+
+        self.handle_tree()
+        self.append_tree(self._node)
+
+    def handle_renderable_text(self):
+        if self.is_converting_paragraphs:
+            if not self.is_inside_paragraph:
+                self.open_paragraph()
+            else:
+                self.append_paragraph(self._node)
+
+        else:
+            self.append_tree(self._node)
+
+    def handle_newline(self):
+        # Open/close a paragraph
+        if self._node.count >= 2 and self.is_converting_paragraphs:
+
+            # Close paragraph, wrap in tag, add as node
+            if self.is_inside_paragraph and self._paragraph_tree:
+                self.close_paragraph()
+
+            # Open paragraph and scope. Dont need to add node.
+            else:
+                self.open_paragraph(include_node=False)
+
+        else:
+            if self.is_converting_newlines:
+                # we dont want to put <br/> in between blocks so
+                # we actually only want to put them in paragraphs
+                # if we're converting or anywhere if we're not
+                # converting paragraphs
+                if self.is_inside_paragraph:
+                    self.append_paragraph(self._node)
+                elif not self.is_converting_paragraphs:
+                    self.append_tree(self._node)
+                else:
+                    # Not removing and not converting so change
+                    # back to NewlineText
+                    new_node = NewlineText(self._node.text)
+                    new_node.count = self._node.count
+                    self.append_tree(new_node)
+
+            elif not self.is_removing_newlines:
+                # Not removing and not converting so change back
+                # to NewlineText
+                new_node = NewlineText(self._node.text)
+                new_node.count = self._node.count
+                if self.is_inside_paragraph:
+                    self.append_paragraph(new_node)
+                else:
+                    self.append_tree(new_node)
+
+    def handle_tree(self):
+
+        self.stack_push()
+
+        for node in self._node.tree:
+            self._node = node
+
+            if is_inline_tag(self._node):
+                self.handle_inline_tag()
+
+            elif is_block_tag(self._node):
+                self.handle_block_tag()
+
+            elif isinstance(self._node, RENDERABLE_TEXT):
+                self.handle_renderable_text()
+
+            elif isinstance(self._node, NewlineText):
+                self.handle_newline()
+
+        if self.is_inside_paragraph and self._paragraph_tree:
+            self.close_paragraph()
+
+        _tree = self._tree
+        self.stack_pop()
+        self._node.tree = _tree
+
+    def amend_tree(self):
+        self._tree = []
+        self._node = self.root_node
+        self._paragraph_tree = None
+        self._inside_paragraph = False
+
+        self.handle_tree()
