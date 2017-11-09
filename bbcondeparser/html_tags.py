@@ -126,7 +126,6 @@ class BaseHTMLTagMeta(BaseTagMeta):
         Raises:
             ValueError: if some values are set and shouldnt
         """
-
         if tag_cls.newline_behaviour not in NEWLINE_BEHAVIOURS:
             raise ValueError('newline_behaviour must be one of {}'.format(
                 NEWLINE_BEHAVIOURS))
@@ -143,6 +142,17 @@ class BaseHTMLTagMeta(BaseTagMeta):
 
 
 def get_newline_behaviour(current_value, new_value):
+    """Return the newline behaviour based on current and new values.
+
+    NEWLINE_BEHAVIOURS is used to store what behaviours take privaledge.
+
+    Args:
+        current_value (str): the current behaviour
+        new_value (str): the potential new behaviour
+
+    Returns:
+        str: the behaviour
+    """
     if NEWLINE_BEHAVIOURS[new_value] > NEWLINE_BEHAVIOURS[current_value]:
         return new_value
     else:
@@ -168,11 +178,35 @@ def get_convert_paragraphs(current_value, new_value):
 
 
 def get_trim_whitespace(current_value, new_value):
+    """Return whether we are trimming whitespace.
+
+    Works the same way as get_convert_paragraphs. I just couldnt think of a
+    suitable name for one function that covers both.
+
+    Args:
+        current_value (None|Bool): the current value
+        new_value (None|Bool): the potential value
+
+    Returns:
+        None|Bool: the convert paragraph value
+    """
     return get_convert_paragraphs(current_value, new_value)
 
 
 def apply_ctx(new_ctx, src_ctx):
+    """Update contexts.
 
+    Special keys such as convert_paragraphs, trim_whitespace and
+    newline_behaviour have their values worked out. Anything is just
+    overwritten or assigned.
+
+    Args:
+        new_ctx (dict): new context
+        src_ctx (dict): source context
+
+    Returns:
+        dict: the new context
+    """
     for ctx_key, ctx_value in src_ctx.items():
         if ctx_key in new_ctx:
             current_value = new_ctx[ctx_key]
@@ -203,11 +237,13 @@ class BaseHTMLTag(BaseTag):
     """BaseHTMLTag, used for all HTML tags.
 
     Attributes:
-        convert_newlines (bool, str): convert newlines to the HTML equivalent,
-            can be True, False or 'inherit'
-        convert_paragraphs (bool, str): convert double newlines to paragraphs,
-            can be True, False or 'inherit'
         tag_display (str): tag display mode - block or inline
+        newline_behaviour (None, str): the behaviour of newlines for this tag.
+            Can be None, 'convert', 'ignore' or 'remove'.
+        convert_paragraphs (None, bool): convert double newlines to paragraphs,
+            can be True, False or None.
+        trim_whitespace (None, bool): remove whitespace from rendered text. Can
+            be True, False or None.
     """
 
     tag_display = 'inline'
@@ -319,12 +355,12 @@ class BaseHTMLRenderTreeParser(BaseTreeParser):
     nowhere should there be converted newlines or paragraphs.
 
     However if we think of this:
-        parser {convert_newlines=True}
+        parser {newline_behaviour='convert'}
             text
-            infobox {convert_newlines=False}
+            infobox {newline_behaviour='ignore'}
                 text
                 text
-                infobox2 {convert_newlines=True}
+                infobox2 {newline_behaviour='convert'}
                     text
                     text
                 text
@@ -332,13 +368,13 @@ class BaseHTMLRenderTreeParser(BaseTreeParser):
 
         should produce
 
-        parser {convert_newlines=True}
+        parser {newline_behaviour='convert'}
             text
             <br />
-            infobox {convert_newlines=False}
+            infobox {newline_behaviour='ignore'}
                 text
                 text
-                infobox2 {convert_newlines=True}
+                infobox2 {newline_behaviour='convert'}
                     text
                     text
                 text
@@ -346,11 +382,13 @@ class BaseHTMLRenderTreeParser(BaseTreeParser):
             text
 
     Attributes:
-        convert_newlines (bool): allow newline conversion
-        convert_paragraphs (bool): allow paragraph conversion
-        newline_text_class (NewlineText): type of class to use for newlines
         raw_text_class (RawText): type of class to use for raw text
-        strip_newlines (bool): remove newlines
+        newline_text_class (NewlineText): type of class to use for newlines
+        newline_behaviour (None, str): whether we want to ignore, remove or
+            strip newlines from the text. Values can be None, 'convert',
+            'remove' or 'ignore'.
+        convert_paragraphs (None, bool): whether we want to convert double
+            newlines into paragraphs. Values can be None, True or False.
 
     """
 
@@ -438,7 +476,6 @@ class _BaseHTMLRenderTreeParser(object):
             self.convert_paragraphs,
         )
         self._tree = []
-        # self._node = None
         self._paragraph_tree = None
         self._inside_paragraph = False
         ctx = self._node.get_context()
@@ -482,7 +519,8 @@ class _BaseHTMLRenderTreeParser(object):
             self._paragraph_tree = []
 
     def close_paragraph(self):
-        # clone paragraph scope?
+        # When we create the ParagraphTag and assign the tree, waaay back in
+        # BaseNode we are also assigning the parent to all of the children.
         paragraph_node = ParagraphTag({}, self._paragraph_tree, '', '')
         self.append_tree(paragraph_node)
         self._paragraph_tree = None
