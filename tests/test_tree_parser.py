@@ -43,7 +43,7 @@ class TestCreateTagDict(unittest.TestCase):
 
         input_text = [Tag1, Tag2, Tag3]
 
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(ValueError):
             tree_parser.create_tag_dict(input_text)
 
 

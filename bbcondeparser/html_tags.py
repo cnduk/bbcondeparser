@@ -119,20 +119,20 @@ class BaseHTMLTagMeta(BaseTagMeta):
             tag_cls (BaseHTMLTag): tag class
 
         Raises:
-            RuntimeError: if some values are set and shouldnt
+            ValueError: if some values are set and shouldnt
         """
 
         if tag_cls.newline_behaviour not in NEWLINE_BEHAVIOURS:
-            raise RuntimeError('newline_behaviour must be one of {}'.format(
+            raise ValueError('newline_behaviour must be one of {}'.format(
                 NEWLINE_BEHAVIOURS))
 
         if is_inline_tag(tag_cls) and tag_cls.convert_paragraphs:
-            raise RuntimeError(
+            raise ValueError(
                 "Cannot enable convert_paragraphs "
                 "on inline tag {tag_cls.tag_name}".format(tag_cls=tag_cls))
 
         if not is_inline_tag(tag_cls) and not is_block_tag(tag_cls):
-            raise RuntimeError(
+            raise ValueError(
                 "Unknown tag display type: {tag_cls.tag_type}"
                 "on {tag_cls.tag_name}".format(tag_cls=tag_cls))
 

@@ -161,7 +161,7 @@ class TagCategory(object):
         assert issubclass(tag_cls, BaseTag)
         for curr_tag_cls in self.tag_classes:
             if curr_tag_cls.tag_name == tag_cls.tag_name:
-                raise RuntimeError(
+                raise ValueError(
                     "Cannot add {tag_cls} to tag category"
                     " '{self}' as name '{tag_cls.tag_name}'"
                     " clashes with tag {curr_tag_cls}."
@@ -428,7 +428,7 @@ def parse_tag_set(tag_set):
             tags.add(tag)
 
         else:
-            raise RuntimeError(
+            raise TypeError(
                 "Unknown object passed to parse_tag_set: (type {}) {}".format(
                     type(tag), tag
                 )
@@ -438,7 +438,7 @@ def parse_tag_set(tag_set):
     seen = set()
     for tag in tags:
         if tag.tag_name in seen:
-            raise RuntimeError(
+            raise ValueError(
                 "Duplicate tag names detected: {}".format(tag.tag_name))
         seen.add(tag.tag_name)
 
