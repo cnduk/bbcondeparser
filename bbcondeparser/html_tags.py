@@ -38,6 +38,11 @@ NEWLINE_BEHAVIOURS = {
     'ignore': 2,
     'remove': 3,
 }
+PARAGRAPH_BEHAVIOURS = {
+    None: 0,
+    True: 1,
+    False: 2,
+}
 RENDERABLE_TEXT = (ErrorText, RawText)
 
 
@@ -145,9 +150,18 @@ def get_newline_behaviour(current_value, new_value):
 
 
 def get_convert_paragraphs(current_value, new_value):
-    if current_value is None:
-        return new_value
-    elif new_value is False:
+    """Return whether we are converting paragraphs.
+
+    PARAGRAPH_BEHAVIOURS is used to store what behaviours take privaledge.
+
+    Args:
+        current_value (None|Bool): the current value
+        new_value (None|Bool): the potential new value
+
+    Returns:
+        None|Bool: the convert paragraph value
+    """
+    if PARAGRAPH_BEHAVIOURS[new_value] > PARAGRAPH_BEHAVIOURS[current_value]:
         return new_value
     else:
         return current_value
