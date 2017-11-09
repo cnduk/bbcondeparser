@@ -19,12 +19,15 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from __future__ import unicode_literals
+
 import cgi
+from collections import namedtuple
 
 from . import _six as six
 
 from .tags import (
-    RawText, BaseTagMeta, BaseTag, NewlineText, ErrorText, RootTag)
+    BaseNode, RawText, BaseTagMeta, BaseTag, NewlineText, ErrorText, RootTag)
 from .tree_parser import BaseTreeParser
 
 
@@ -34,6 +37,11 @@ NEWLINE_BEHAVIOURS = {
     'convert': 1,
     'ignore': 2,
     'remove': 3,
+}
+PARAGRAPH_BEHAVIOURS = {
+    None: 0,
+    True: 1,
+    False: 2,
 }
 RENDERABLE_TEXT = (ErrorText, RawText)
 
@@ -116,51 +124,104 @@ class BaseHTMLTagMeta(BaseTagMeta):
             tag_cls (BaseHTMLTag): tag class
 
         Raises:
-            RuntimeError: if some values are set and shouldnt
+            ValueError: if some values are set and shouldnt
         """
-        ctx_default = tag_cls.context_default
-        ctx_override = tag_cls.context_override
-
-        newline_behaviour = ctx_default.get('newline_behaviour')
-        if newline_behaviour not in NEWLINE_BEHAVIOURS:
-            raise RuntimeError('newline_behaviour must be one of {}'.format(
+        if tag_cls.newline_behaviour not in NEWLINE_BEHAVIOURS:
+            raise ValueError('newline_behaviour must be one of {}'.format(
                 NEWLINE_BEHAVIOURS))
 
-        newline_behaviour = ctx_override.get('newline_behaviour')
-        if newline_behaviour not in NEWLINE_BEHAVIOURS:
-            raise RuntimeError('newline_behaviour must be one of {}'.format(
-                NEWLINE_BEHAVIOURS))
-
-        if is_inline_tag(tag_cls)\
-            and (
-                ctx_default.get('convert_paragraphs') is True
-                or ctx_override.get('convert_paragraphs') is True
-        ):
-            raise RuntimeError(
+        if is_inline_tag(tag_cls) and tag_cls.convert_paragraphs:
+            raise ValueError(
                 "Cannot enable convert_paragraphs "
                 "on inline tag {tag_cls.tag_name}".format(tag_cls=tag_cls))
 
         if not is_inline_tag(tag_cls) and not is_block_tag(tag_cls):
-            raise RuntimeError(
+            raise ValueError(
                 "Unknown tag display type: {tag_cls.tag_type}"
                 "on {tag_cls.tag_name}".format(tag_cls=tag_cls))
 
 
-def apply_ctx(new_ctx, src_ctx):
+def get_newline_behaviour(current_value, new_value):
+    """Return the newline behaviour based on current and new values.
 
+    NEWLINE_BEHAVIOURS is used to store what behaviours take privaledge.
+
+    Args:
+        current_value (str): the current behaviour
+        new_value (str): the potential new behaviour
+
+    Returns:
+        str: the behaviour
+    """
+    if NEWLINE_BEHAVIOURS[new_value] > NEWLINE_BEHAVIOURS[current_value]:
+        return new_value
+    else:
+        return current_value
+
+
+def get_convert_paragraphs(current_value, new_value):
+    """Return whether we are converting paragraphs.
+
+    PARAGRAPH_BEHAVIOURS is used to store what behaviours take privaledge.
+
+    Args:
+        current_value (None|Bool): the current value
+        new_value (None|Bool): the potential new value
+
+    Returns:
+        None|Bool: the convert paragraph value
+    """
+    if PARAGRAPH_BEHAVIOURS[new_value] > PARAGRAPH_BEHAVIOURS[current_value]:
+        return new_value
+    else:
+        return current_value
+
+
+def get_trim_whitespace(current_value, new_value):
+    """Return whether we are trimming whitespace.
+
+    Works the same way as get_convert_paragraphs. I just couldnt think of a
+    suitable name for one function that covers both.
+
+    Args:
+        current_value (None|Bool): the current value
+        new_value (None|Bool): the potential value
+
+    Returns:
+        None|Bool: the convert paragraph value
+    """
+    return get_convert_paragraphs(current_value, new_value)
+
+
+def apply_ctx(new_ctx, src_ctx):
+    """Update contexts.
+
+    Special keys such as convert_paragraphs, trim_whitespace and
+    newline_behaviour have their values worked out. Anything is just
+    overwritten or assigned.
+
+    Args:
+        new_ctx (dict): new context
+        src_ctx (dict): source context
+
+    Returns:
+        dict: the new context
+    """
     for ctx_key, ctx_value in src_ctx.items():
         if ctx_key in new_ctx:
             current_value = new_ctx[ctx_key]
 
-            if ctx_key in ('convert_paragraphs', 'trim_whitespace'):
-                if current_value is None:
-                    new_ctx[ctx_key] = ctx_value
-                elif ctx_value is False:
-                    new_ctx[ctx_key] = False
+            if ctx_key == 'convert_paragraphs':
+                new_ctx[ctx_key] = get_convert_paragraphs(
+                    current_value, ctx_value)
+
+            elif ctx_key == 'trim_whitespace':
+                new_ctx[ctx_key] = get_trim_whitespace(
+                    current_value, ctx_value)
 
             elif ctx_key == 'newline_behaviour':
-                if NEWLINE_BEHAVIOURS[ctx_value] > NEWLINE_BEHAVIOURS[current_value]:
-                    new_ctx[ctx_key] = ctx_value
+                new_ctx[ctx_key] = get_newline_behaviour(
+                    current_value, ctx_value)
 
             else:
                 new_ctx[ctx_key] = ctx_value
@@ -176,20 +237,19 @@ class BaseHTMLTag(BaseTag):
     """BaseHTMLTag, used for all HTML tags.
 
     Attributes:
-        convert_newlines (bool, str): convert newlines to the HTML equivalent,
-            can be True, False or 'inherit'
-        convert_paragraphs (bool, str): convert double newlines to paragraphs,
-            can be True, False or 'inherit'
         tag_display (str): tag display mode - block or inline
+        newline_behaviour (None, str): the behaviour of newlines for this tag.
+            Can be None, 'convert', 'ignore' or 'remove'.
+        convert_paragraphs (None, bool): convert double newlines to paragraphs,
+            can be True, False or None.
+        trim_whitespace (None, bool): remove whitespace from rendered text. Can
+            be True, False or None.
     """
 
     tag_display = 'inline'
-    context_default = {
-        'newline_behaviour': None,
-        'convert_paragraphs': None,
-        'trim_whitespace': None,
-    }
-    context_override = {}
+    newline_behaviour = None
+    convert_paragraphs = None
+    trim_whitespace = None
 
     def find_children_instances(self, cls, multi=True):
         """This method searches immediate children for instances of `cls`
@@ -226,64 +286,31 @@ class BaseHTMLTag(BaseTag):
         # Return the last defined
         return items[-1][1]
 
-    def get_context(self):
-        if self._context is None:
-            # Defaults
-            new_ctx = self.context_default.copy()
-            # Inherit
-            if self._parent_node:
-                inherited_ctx = self._parent_node.get_context().copy()
-                new_ctx = apply_ctx(new_ctx, inherited_ctx)
-            # Override
-            new_ctx = apply_ctx(new_ctx, self.context_override)
-
-            # Anything that is not a block tag must not render paragraphs
-            if is_inline_tag(self):
-                new_ctx['convert_paragraphs'] = False
-
-            self._context = new_ctx
-
-        return self._context
-
     def render(self):
         """Return the rendering of this tag (including children)
             (N.B. This inherintly includes children, no way not to.
         """
         child_text = self._render()
 
-        if self.get_context().get('trim_whitespace', False):
+        if self.trim_whitespace:
             child_text = child_text.strip()
 
         return child_text
 
-    def render_children(self):
-        return render_tree(self)
+    def get_context(self):
+        return apply_ctx(
+            super(BaseHTMLTag, self).get_context().copy(),
+            {
+                'newline_behaviour': self.newline_behaviour,
+                'convert_paragraphs': self.convert_paragraphs,
+            },
+        )
 
 
 class RootHTMLTag(RootTag):
-    context_default = {
-        'convert_paragraphs': None,
-        'newline_behaviour': None,
-        'trim_whitespace': None,
-    }
-
-    def get_context(self, ctx=None):
-        if self._context is None or ctx:
-            new_ctx = super(RootHTMLTag, self).get_context()
-            if ctx:
-                new_ctx.update(ctx)
-            self._context = new_ctx
-
-        return self._context
-
-    def render(self, ctx=None):
-        """Render the tag.
-
-        Returns:
-            str: the rendered tag
-        """
-        self.get_context(ctx=ctx)
-        return render_tree(self)
+    newline_behaviour = None
+    convert_paragraphs = None
+    trim_whitespace = None
 
 
 class HtmlSimpleTag(BaseHTMLTag):
@@ -296,9 +323,7 @@ class HtmlSimpleTag(BaseHTMLTag):
 
     template = None
     replace_text = '{{ body }}'
-    context_override = {
-        'convert_paragraphs': False,
-    }
+    convert_paragraphs = False
 
     def _render(self):
         rendered_children = self.render_children()
@@ -308,6 +333,16 @@ class HtmlSimpleTag(BaseHTMLTag):
 
         else:
             return self.template.replace(self.replace_text, rendered_children)
+
+
+class ParagraphTag(BaseHTMLTag):
+    tag_name = 'p'
+    # It is block but has the behaviour of an inline
+    tag_display = 'inline'
+    convert_paragraphs = False
+
+    def _render(self):
+        return '<p>{children}</p>'.format(children=self.render_children())
 
 
 class BaseHTMLRenderTreeParser(BaseTreeParser):
@@ -320,12 +355,12 @@ class BaseHTMLRenderTreeParser(BaseTreeParser):
     nowhere should there be converted newlines or paragraphs.
 
     However if we think of this:
-        parser {convert_newlines=True}
+        parser {newline_behaviour='convert'}
             text
-            infobox {convert_newlines=False}
+            infobox {newline_behaviour='ignore'}
                 text
                 text
-                infobox2 {convert_newlines=True}
+                infobox2 {newline_behaviour='convert'}
                     text
                     text
                 text
@@ -333,13 +368,13 @@ class BaseHTMLRenderTreeParser(BaseTreeParser):
 
         should produce
 
-        parser {convert_newlines=True}
+        parser {newline_behaviour='convert'}
             text
             <br />
-            infobox {convert_newlines=False}
+            infobox {newline_behaviour='ignore'}
                 text
                 text
-                infobox2 {convert_newlines=True}
+                infobox2 {newline_behaviour='convert'}
                     text
                     text
                 text
@@ -347,119 +382,252 @@ class BaseHTMLRenderTreeParser(BaseTreeParser):
             text
 
     Attributes:
-        convert_newlines (bool): allow newline conversion
-        convert_paragraphs (bool): allow paragraph conversion
-        newline_text_class (NewlineText): type of class to use for newlines
         raw_text_class (RawText): type of class to use for raw text
-        strip_newlines (bool): remove newlines
+        newline_text_class (NewlineText): type of class to use for newlines
+        newline_behaviour (None, str): whether we want to ignore, remove or
+            strip newlines from the text. Values can be None, 'convert',
+            'remove' or 'ignore'.
+        convert_paragraphs (None, bool): whether we want to convert double
+            newlines into paragraphs. Values can be None, True or False.
 
     """
 
     raw_text_class = HTMLText
     newline_text_class = HTMLNewlineText
     root_tag_class = RootHTMLTag
+    newline_behaviour = None
+    convert_paragraphs = None
+
+    def __init__(self, text, newline_behaviour=None, convert_paragraphs=None):
+        super(BaseHTMLRenderTreeParser, self).__init__(text)
+
+        newline_behaviour = get_newline_behaviour(
+            self.newline_behaviour, newline_behaviour)
+        convert_paragraphs = get_convert_paragraphs(
+            self.convert_paragraphs, convert_paragraphs)
+
+        self.root_node = amend_tree(
+            self.root_node, newline_behaviour, convert_paragraphs)
 
 
-def peek_node(tree, node_index):
-    """Have a cheeky look at the next node in the tree.
-
-    Args:
-        tree (list): list of nodes
-        node_index (int): node index to look at
-
-    Returns:
-        Tag, False: found tag or False if nothing is found
-    """
-    try:
-        return tree[node_index]
-    except IndexError:
-        return False
+def amend_tree(root_node, newline_behaviour=None, convert_paragraphs=None):
+    inst = _BaseHTMLRenderTreeParser(
+        root_node, newline_behaviour, convert_paragraphs)
+    inst.amend_tree()
+    return inst.root_node
 
 
-def is_open_paragraph(node, convert_paragraphs, inside_paragraph):
-    return node\
-        and (is_inline_tag(node) or isinstance(node, RENDERABLE_TEXT))\
-        and convert_paragraphs\
-        and not inside_paragraph
+StackLevel = namedtuple(
+    'TreeParserStackLevel',
+    ['tree', 'node', 'paragraph_tree', 'inside_paragraph', 'newline_behaviour',
+        'convert_paragraphs']
+)
 
 
-def render_tree(parent_node):
-    """Render the tree of tags.
+class NodeStack(object):
 
-    Args:
-        tree (list): list of tags
-        convert_newlines (bool, optional): whether to convert newlines
-        convert_paragraphs (bool, optional): whether to convert paragraphs
-        strip_newlines (bool, optional): whether to strip newlines
+    def __init__(self):
+        self.stack = []
 
-    Returns:
-        str: rendered children
-    """
-    rendered_children = []
-    inside_paragraph = False
+    def __bool__(self):
+        return len(self) > 0
 
-    tree = parent_node.tree
-    parent_ctx = parent_node.get_context()
-    convert_paragraphs = parent_ctx.get('convert_paragraphs', False)
-    convert_newlines = parent_ctx.get('newline_behaviour') == 'convert'
-    strip_newlines = parent_ctx.get('newline_behaviour') == 'remove'
+    __nonzero__ = __bool__
 
-    for node_index, node in enumerate(tree):
+    def __len__(self):
+        return len(self.stack)
 
-        if is_inline_tag(node):
-            if is_open_paragraph(node, convert_paragraphs, inside_paragraph):
-                rendered_children.append('<p>')
-                inside_paragraph = True
-            rendered_children.append(node.render())
+    def __getitem__(self, index):
+        return self.stack[index]
 
-        elif is_block_tag(node):
-            if convert_paragraphs and inside_paragraph:
-                rendered_children.append('</p>')
-                inside_paragraph = False
-            rendered_children.append(node.render())
+    def pop(self):
+        return self.stack.pop()
 
-        elif isinstance(node, RENDERABLE_TEXT):
-            if is_open_paragraph(node, convert_paragraphs, inside_paragraph):
-                rendered_children.append('<p>')
-                inside_paragraph = True
-            rendered_children.append(node.render())
+    def push(self, *args, **kwargs):
+        item = StackLevel(*args, **kwargs)
+        self.stack.append(item)
 
-        elif isinstance(node, NewlineText):
-            if node.count > 1:
-                if convert_paragraphs:
-                    if inside_paragraph:
-                        rendered_children.append('</p>')
-                        inside_paragraph = False
 
-                    next_node = peek_node(tree, node_index + 1)
-                    if next_node and not is_block_tag(next_node):
-                        rendered_children.append('<p>')
-                        inside_paragraph = True
+class _BaseHTMLRenderTreeParser(object):
 
-                    elif not strip_newlines:
-                        rendered_children.append(node.render_raw())
+    def __init__(self, root_node, newline_behaviour=None,
+                 convert_paragraphs=None):
 
-                elif convert_newlines:
-                    rendered_children.append(node.render())
+        self.root_node = root_node
+        self.stack = NodeStack()
+        self.newline_behaviour = newline_behaviour
+        self.convert_paragraphs = convert_paragraphs
 
-                elif not strip_newlines:
-                    rendered_children.append(node.render_raw())
+        self._inside_paragraph = False
+        self._paragraph_tree = None
+        self._tree = []
+        self._node = None
 
+    def append_tree(self, item):
+        self._tree.append(item)
+
+    def append_paragraph(self, item):
+        self._paragraph_tree.append(item)
+
+    def stack_push(self):
+        self.stack.push(
+            self._tree, self._node, self._paragraph_tree,
+            self._inside_paragraph, self.newline_behaviour,
+            self.convert_paragraphs,
+        )
+        self._tree = []
+        self._paragraph_tree = None
+        self._inside_paragraph = False
+        ctx = self._node.get_context()
+        self.newline_behaviour = get_newline_behaviour(
+            self.newline_behaviour, ctx.get('newline_behaviour'))
+        self.convert_paragraphs = get_convert_paragraphs(
+            self.convert_paragraphs, ctx.get('convert_paragraphs'))
+
+    def stack_pop(self):
+        self.set_state(self.stack.pop())
+
+    def set_state(self, stack_ctx):
+        self._tree = stack_ctx.tree
+        self._node = stack_ctx.node
+        self._paragraph_tree = stack_ctx.paragraph_tree
+        self._inside_paragraph = stack_ctx.inside_paragraph
+        self.newline_behaviour = stack_ctx.newline_behaviour
+        self.convert_paragraphs = stack_ctx.convert_paragraphs
+
+    @property
+    def is_converting_paragraphs(self):
+        return self.convert_paragraphs is True
+
+    @property
+    def is_removing_newlines(self):
+        return self.newline_behaviour == 'remove'
+
+    @property
+    def is_converting_newlines(self):
+        return self.newline_behaviour == 'convert'
+
+    @property
+    def is_inside_paragraph(self):
+        return self._inside_paragraph is True
+
+    def open_paragraph(self, include_node=True):
+        self._inside_paragraph = True
+        if include_node:
+            self._paragraph_tree = [self._node]
+        else:
+            self._paragraph_tree = []
+
+    def close_paragraph(self):
+        # When we create the ParagraphTag and assign the tree, waaay back in
+        # BaseNode we are also assigning the parent to all of the children.
+        paragraph_node = ParagraphTag({}, self._paragraph_tree, '', '')
+        self.append_tree(paragraph_node)
+        self._paragraph_tree = None
+        self._inside_paragraph = False
+
+    def handle_inline_tag(self):
+        self.handle_tree()
+
+        if self.is_converting_paragraphs:
+            if not self.is_inside_paragraph:
+                self.open_paragraph()
             else:
-                next_node = peek_node(tree, node_index + 1)
-                if convert_newlines:
-                    if not is_open_paragraph(
-                            next_node, convert_paragraphs, inside_paragraph):
-                        rendered_children.append(node.render())
+                self.append_paragraph(self._node)
 
-                    elif not strip_newlines:
-                        rendered_children.append(node.render_raw())
+        else:
+            self.append_tree(self._node)
 
-                elif not strip_newlines:
-                    rendered_children.append(node.render_raw())
+    def handle_block_tag(self):
+        if self.is_inside_paragraph and self._paragraph_tree:
+            self.close_paragraph()
 
-    if convert_paragraphs and inside_paragraph:
-        rendered_children.append('</p>')
-        inside_paragraph = False
+        self.handle_tree()
+        self.append_tree(self._node)
 
-    return ''.join(rendered_children)
+    def handle_renderable_text(self):
+        if self.is_converting_paragraphs:
+            if not self.is_inside_paragraph:
+                self.open_paragraph()
+            else:
+                self.append_paragraph(self._node)
+
+        else:
+            self.append_tree(self._node)
+
+    def handle_newline(self):
+        # Open/close a paragraph
+        if self._node.count >= 2 and self.is_converting_paragraphs:
+
+            # Close paragraph, wrap in tag, add as node
+            if self.is_inside_paragraph and self._paragraph_tree:
+                self.close_paragraph()
+
+            # Open paragraph and scope. Dont need to add node.
+            else:
+                self.open_paragraph(include_node=False)
+
+        else:
+            if self.is_converting_newlines:
+                # we dont want to put <br/> in between blocks so
+                # we actually only want to put them in paragraphs
+                # if we're converting or anywhere if we're not
+                # converting paragraphs
+                if self.is_inside_paragraph:
+                    self.append_paragraph(self._node)
+                elif not self.is_converting_paragraphs:
+                    self.append_tree(self._node)
+                else:
+                    # Not removing and not converting so change
+                    # back to NewlineText
+                    new_node = NewlineText(self._node.text)
+                    new_node.count = self._node.count
+                    self.append_tree(new_node)
+
+            elif not self.is_removing_newlines:
+                # Not removing and not converting so change back
+                # to NewlineText
+                new_node = NewlineText(self._node.text)
+                new_node.count = self._node.count
+                if self.is_inside_paragraph:
+                    self.append_paragraph(new_node)
+                else:
+                    self.append_tree(new_node)
+
+    def handle_tree(self):
+
+        self.stack_push()
+
+        for node in self._node.tree:
+            self._node = node
+
+            if is_inline_tag(self._node):
+                self.handle_inline_tag()
+
+            elif is_block_tag(self._node):
+                self.handle_block_tag()
+
+            elif isinstance(self._node, RENDERABLE_TEXT):
+                self.handle_renderable_text()
+
+            elif isinstance(self._node, NewlineText):
+                self.handle_newline()
+
+        if self.is_inside_paragraph and self._paragraph_tree:
+            self.close_paragraph()
+
+        _tree = self._tree
+        self.stack_pop()
+        self._node.tree = _tree
+
+        for node in self._node.tree:
+            if isinstance(node, BaseNode):
+                node.set_parent_node(self._node)
+
+    def amend_tree(self):
+        self._tree = []
+        self._node = self.root_node
+        self._paragraph_tree = None
+        self._inside_paragraph = False
+
+        self.handle_tree()

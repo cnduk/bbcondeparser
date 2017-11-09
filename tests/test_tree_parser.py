@@ -43,7 +43,7 @@ class TestCreateTagDict(unittest.TestCase):
 
         input_text = [Tag1, Tag2, Tag3]
 
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(ValueError):
             tree_parser.create_tag_dict(input_text)
 
 
@@ -625,7 +625,7 @@ class TestTreeParserContext(unittest.TestCase):
             def _render(self):
                 ctx = self.get_context()
                 return '<b>{bold}. {children}</b>'.format(
-                    bold=ctx['b'],
+                    bold=ctx.get('b'),
                     children=self.render_children(),
                 )
 
@@ -635,12 +635,12 @@ class TestTreeParserContext(unittest.TestCase):
             def _render(self):
                 ctx = self.get_context()
                 return '<i>{italic}. {children}</i>'.format(
-                    italic=ctx['i'],
+                    italic=ctx.get('i'),
                     children=self.render_children()
                 )
 
         class TestParser(tree_parser.BaseTreeParser):
-            tags = [Bold, Bold, Italic]
+            tags = [Bold, Italic]
 
         input_text = "[b][i]It's not a tumor![/i][/b]"
         expected_text = "<b>bold. <i>italic. It's not a tumor!</i></b>"
@@ -656,14 +656,10 @@ class TestTreeParserContext(unittest.TestCase):
     def test_context_updates(self):
         class Bold(MockBaseTag):
             tag_name = 'b'
-            context_override = {
-                'b': 'italic',
-            }
 
             def _render(self):
-                ctx = self.get_context()
                 return '<b>{bold}. {children}</b>'.format(
-                    bold=ctx['b'],
+                    bold='italic',
                     children=self.render_children(),
                 )
 
@@ -673,7 +669,7 @@ class TestTreeParserContext(unittest.TestCase):
             def _render(self):
                 ctx = self.get_context()
                 return '<i>{italic}. {children}</i>'.format(
-                    italic=ctx['i'],
+                    italic=ctx.get('i'),
                     children=self.render_children()
                 )
 
@@ -694,32 +690,26 @@ class TestTreeParserContext(unittest.TestCase):
     def test_context_tag_updates(self):
         class Bold(MockBaseTag):
             tag_name = 'b'
-            context_default = {
-                'b': 'BOLD',
-            }
 
             def _render(self):
                 ctx = self.get_context()
                 return '<b>{bold}. {children}</b>'.format(
-                    bold=ctx['b'],
+                    bold=ctx.get('b', 'BOLD'),
                     children=self.render_children(),
                 )
 
         class Italic(MockBaseTag):
             tag_name = 'i'
-            context_default = {
-                'i': 'ITALIC',
-            }
 
             def _render(self):
                 ctx = self.get_context()
                 return '<i>{italic}. {children}</i>'.format(
-                    italic=ctx['i'],
+                    italic=ctx.get('i', 'ITALIC'),
                     children=self.render_children()
                 )
 
         class TestParser(tree_parser.BaseTreeParser):
-            tags = [Bold, Bold, Italic]
+            tags = [Bold, Italic]
 
         input_text = "[b][i]It's not a tumor![/i][/b]"
         expected_text = "<b>NOT BOLD. <i>ITALIC. It's not a tumor!</i></b>"

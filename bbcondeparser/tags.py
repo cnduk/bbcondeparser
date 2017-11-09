@@ -21,66 +21,21 @@
 from . import _six as six
 
 
-from .utils import strip_newlines
-
 NEWLINE_STR = '\n'
-NEWLINE_BEHAVIOURS = {
-    None: 0,
-    'ignore': 1,
-    'remove': 2,
-}
-
-
-def apply_ctx(new_ctx, src_ctx):
-
-    for ctx_key, ctx_value in src_ctx.items():
-        if ctx_key in new_ctx:
-            current_value = new_ctx[ctx_key]
-
-            if ctx_key == 'trim_whitespace':
-                if current_value is None:
-                    new_ctx[ctx_key] = ctx_value
-                elif ctx_value is False:
-                    new_ctx[ctx_key] = False
-
-            elif ctx_key == 'newline_behaviour':
-                if NEWLINE_BEHAVIOURS[ctx_value] > NEWLINE_BEHAVIOURS[current_value]:
-                    new_ctx[ctx_key] = ctx_value
-
-            else:
-                new_ctx[ctx_key] = ctx_value
-
-        else:
-            new_ctx[ctx_key] = ctx_value
-
-    return new_ctx
 
 
 class BaseNode(object):
-    context_default = {}
-    context_override = {}
 
     def __init__(self):
-        self._context = None
         self._parent_node = None
 
     def set_parent_node(self, parent_node):
         self._parent_node = parent_node
 
     def get_context(self):
-        if self._context is None:
-            # Defaults
-            new_ctx = self.context_default.copy()
-            # Inherit
-            if self._parent_node:
-                inherited_ctx = self._parent_node.get_context().copy()
-                new_ctx = apply_ctx(new_ctx, inherited_ctx)
-            # Override
-            new_ctx = apply_ctx(new_ctx, self.context_override)
-
-            self._context = new_ctx
-
-        return self._context
+        if self._parent_node:
+            return self._parent_node.get_context()
+        return {}
 
     def render(self):
         return self._render()
@@ -180,19 +135,7 @@ class BaseTagMeta(type):
         # TODO `self_closing` vs `allowed_tags`
         # tag_name warning malformed?
         # category shouldbe TagCategory instance
-        if tag_cls.context_default:
-            newline_behaviour = tag_cls.context_default.get(
-                'newline_behaviour')
-            if newline_behaviour not in NEWLINE_BEHAVIOURS:
-                raise ValueError('newline_behaviour must be one of {}'.format(
-                    NEWLINE_BEHAVIOURS))
-
-        if tag_cls.context_override:
-            newline_behaviour = tag_cls.context_override.get(
-                'newline_behaviour')
-            if newline_behaviour not in NEWLINE_BEHAVIOURS:
-                raise ValueError('newline_behaviour must be one of {}'.format(
-                    NEWLINE_BEHAVIOURS))
+        pass
 
 
 class TagCategory(object):
@@ -218,7 +161,7 @@ class TagCategory(object):
         assert issubclass(tag_cls, BaseTag)
         for curr_tag_cls in self.tag_classes:
             if curr_tag_cls.tag_name == tag_cls.tag_name:
-                raise RuntimeError(
+                raise ValueError(
                     "Cannot add {tag_cls} to tag category"
                     " '{self}' as name '{tag_cls.tag_name}'"
                     " clashes with tag {curr_tag_cls}."
@@ -327,11 +270,6 @@ class BaseTag(BaseNode):
 
     attr_defs = {}
 
-    context_default = {
-        'newline_behaviour': None,
-        'trim_whitespace': None,
-    }
-
     def __init__(self, attrs, tree, start_text, end_text):
         """These classes should not be initialized directly
             (are initialized by the parser).
@@ -400,22 +338,6 @@ class BaseTag(BaseNode):
         """
         return ''.join(child.render() for child in self.tree)
 
-    def render(self):
-        """Return the rendering of this tag (including children)
-            (N.B. This inherintly includes children, no way not to.
-        """
-        text = super(BaseTag, self).render()
-
-        new_ctx = self.get_context()
-
-        if new_ctx.get('trim_whitespace'):
-            text = text.strip()
-
-        if new_ctx.get('newline_behaviour') == 'remove':
-            text = strip_newlines(text)
-
-        return text
-
     def _render(self):
         raise NotImplementedError
 
@@ -473,18 +395,8 @@ class BaseTag(BaseNode):
 
 class RootTag(BaseTag):
 
-    def get_context(self, ctx=None):
-        if self._context is None or ctx:
-            new_ctx = super(RootTag, self).get_context()
-            if ctx:
-                new_ctx.update(ctx)
-            self._context = new_ctx
-
-        return self._context
-
-    def render(self, ctx=None):
-        self.get_context(ctx=ctx)
-        return ''.join(tag.render() for tag in self.tree)
+    def _render(self, ctx=None):
+        return self.render_children()
 
 
 class SimpleTag(BaseTag):
@@ -516,7 +428,7 @@ def parse_tag_set(tag_set):
             tags.add(tag)
 
         else:
-            raise RuntimeError(
+            raise TypeError(
                 "Unknown object passed to parse_tag_set: (type {}) {}".format(
                     type(tag), tag
                 )
@@ -526,7 +438,7 @@ def parse_tag_set(tag_set):
     seen = set()
     for tag in tags:
         if tag.tag_name in seen:
-            raise RuntimeError(
+            raise ValueError(
                 "Duplicate tag names detected: {}".format(tag.tag_name))
         seen.add(tag.tag_name)
 

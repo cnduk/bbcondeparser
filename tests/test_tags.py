@@ -24,7 +24,7 @@ class TestTagCategory(unittest.TestCase):
 
         category.add_tag_cls(Tag1)
 
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(ValueError):
             category.add_tag_cls(Tag1)
 
     def test_as_decorator(self):

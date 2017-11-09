@@ -7,9 +7,7 @@ from bbcondeparser import html_tags
 class TestBaseHTMLTagMeta(unittest.TestCase):
 
     def test_newline_runtime_error(self):
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(ValueError):
             class BadTag(html_tags.BaseHTMLTag):
                 tag_name = 'bad_tag'
-                context_default = {
-                    'newline_behaviour': 'butts',
-                }
+                newline_behaviour = 'butts'
