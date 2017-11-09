@@ -159,7 +159,7 @@ def get_trim_whitespace(current_value, new_value):
 
 def apply_ctx(new_ctx, src_ctx):
 
-    for ctx_key, ctx_value in src_ctx.iteritems():
+    for ctx_key, ctx_value in src_ctx.items():
         if ctx_key in new_ctx:
             current_value = new_ctx[ctx_key]
 
