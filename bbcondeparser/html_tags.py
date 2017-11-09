@@ -27,7 +27,7 @@ from collections import namedtuple
 from . import _six as six
 
 from .tags import (
-    RawText, BaseTagMeta, BaseTag, NewlineText, ErrorText, RootTag)
+    BaseNode, RawText, BaseTagMeta, BaseTag, NewlineText, ErrorText, RootTag)
 from .tree_parser import BaseTreeParser
 
 
@@ -567,6 +567,10 @@ class _BaseHTMLRenderTreeParser(object):
         _tree = self._tree
         self.stack_pop()
         self._node.tree = _tree
+
+        for node in self._node.tree:
+            if isinstance(node, BaseNode):
+                node.set_parent_node(self._node)
 
     def amend_tree(self):
         self._tree = []

@@ -666,3 +666,22 @@ class RenderSelectedTagsTest(BaseTest):
             "[b]bold text[/b][unknown]dunno about this[/unknown]",
             "<strong>bold text</strong>[unknown]dunno about this[/unknown]",
         )
+
+
+class ParentScopeTest(BaseTest):
+
+    def test_no_paragraphs(self):
+        input_text = "Line 1\n\nLine 2\n\nLine 3"
+        parser = DefaultParser(input_text)
+        root_node = parser.root_node
+
+        for node in root_node.tree:
+            self.assertEqual(node._parent_node, root_node)
+
+    def test_with_paragraphs(self):
+        input_text = "Line 1\n\nLine 2\n\nLine 3"
+        parser = ParagraphParser(input_text)
+        root_node = parser.root_node
+
+        for node in root_node.tree:
+            self.assertEqual(node._parent_node, root_node)
