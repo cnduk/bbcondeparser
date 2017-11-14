@@ -18,6 +18,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from __future__ import unicode_literals
+
 from . import _six as six
 
 
@@ -114,7 +116,9 @@ class BaseTagMeta(type):
             def render(self):
                 return self.render_children()
 
-            null_name = 'Null{}'.format(name)
+            # We force this to be a string as python2 internals does not like
+            # unicode class names.
+            null_name = str('Null{}'.format(name))
             null_ctx = dict(ctx)
             null_ctx.pop('__classcell__', None)
             null_ctx['render'] = render
