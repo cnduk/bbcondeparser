@@ -86,7 +86,7 @@ class HTMLNewlineText(NewlineText):
     """HTML version of NewlineText."""
 
     def _render(self):
-        return '<br />' * self.count
+        return '<br />'
 
 
 class HTMLText(RawText):

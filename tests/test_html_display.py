@@ -421,18 +421,22 @@ class NewlineTests(BaseTest):
             'there is one single<br />newline in this copy',
         )
 
+    """
+    Multiple \n should only ever return a single <br />
+    """
+
     def test_double(self):
         self._run_tests(
             NewlineParser,
             'there is two single\n\nnewline in this copy',
-            'there is two single<br /><br />newline in this copy',
+            'there is two single<br />newline in this copy',
         )
 
     def test_triple(self):
         self._run_tests(
             NewlineParser,
             'there is three single\n\n\nnewline in this copy',
-            'there is three single<br /><br /><br />newline in this copy',
+            'there is three single<br />newline in this copy',
         )
 
     def test_true(self):
