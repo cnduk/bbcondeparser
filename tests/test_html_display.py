@@ -623,6 +623,20 @@ class NewlinesParagraphsTest(BaseTest):
             "<div><p>This is a block</p></div>\n<p>This content doesn't matter at all!</p>",
         )
 
+    def test_br_in_paragraph(self):
+        self._run_tests(
+            ParagraphNewlinesParser,
+            "[b]A really nice sentence[/b]\n[div]a div tag[/div]",
+            "<p><strong>A really nice sentence</strong>\n</p><div><p>a div tag</p></div>",
+        )
+
+    def test_newlines_before_paragraph(self):
+        self._run_tests(
+            ParagraphNewlinesParser,
+            "\n[b]A really nice sentence[/b]\n",
+            "\n<p><strong>A really nice sentence</strong>\n</p>",
+        )
+
 
 class ParagraphsStripNewlinesTest(BaseTest):
 

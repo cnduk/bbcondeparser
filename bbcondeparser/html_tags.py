@@ -1,4 +1,4 @@
-
+# -*- coding: utf8 -*-
 # Copyright (c) 2017 Conde Nast Britain
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -537,6 +537,26 @@ class _BaseHTMLRenderTreeParser(object):
             self._paragraph_tree = []
 
     def close_paragraph(self):
+        # Trim any newline tags at either end of the paragraph scope
+        # Convert from the left
+        # ( ͡° ͜ʖ ͡°)
+        for node in self._paragraph_tree:
+            if isinstance(node, HTMLNewlineText):
+                node.set_raw()
+            else:
+                break
+
+        # Convert from the right
+        # ( ͡° ͜ʖ ͡°)
+        for node in self._paragraph_tree[::-1]:
+            if isinstance(node, HTMLNewlineText):
+                node.set_raw()
+            else:
+                break
+
+        # Cha cha real smooth
+        # ( ( ͜ʖ ͡° ͡°
+
         # When we create the ParagraphTag and assign the tree, waaay back in
         # BaseNode we are also assigning the parent to all of the children.
         paragraph_node = ParagraphTag({}, self._paragraph_tree, '', '')
