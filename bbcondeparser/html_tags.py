@@ -85,8 +85,26 @@ def escape_html(text):
 class HTMLNewlineText(NewlineText):
     """HTML version of NewlineText."""
 
+    def __init__(self, *args, **kwargs):
+        super(HTMLNewlineText, self).__init__(*args, **kwargs)
+        self.render_mode = 'html'
+
+    def set_html(self):
+        self.render_mode = 'html'
+
+    def set_raw(self):
+        self.render_mode = 'raw'
+
+    def set_ignore(self):
+        self.render_mode = 'ignore'
+
     def _render(self):
-        return '<br />'
+        if self.render_mode == 'html':
+            return '<br />'
+        elif self.render_mode == 'raw':
+            return self.render_raw()
+        else:
+            return ''
 
 
 class HTMLText(RawText):
@@ -587,12 +605,11 @@ class _BaseHTMLRenderTreeParser(object):
             elif not self.is_removing_newlines:
                 # Not removing and not converting so change back
                 # to NewlineText
-                new_node = NewlineText(self._node.text)
-                new_node.count = self._node.count
+                self._node.set_raw()
                 if self.is_inside_paragraph:
-                    self.append_paragraph(new_node)
+                    self.append_paragraph(self._node)
                 else:
-                    self.append_tree(new_node)
+                    self.append_tree(self._node)
 
     def handle_tree(self):
 
