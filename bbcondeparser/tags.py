@@ -337,6 +337,41 @@ class BaseTag(BaseNode):
             repr(self.end_text), self.attrs
         )
 
+    def find_children_instances(self, cls, multi=True):
+        """This method searches immediate children for instances of `cls`
+            if `multi` is truthy, then a list of found instances is returned.
+            if `multi` is falsy, then only the last found instance is
+                returned, and any extra instances found before hand are
+                replaced with ErrorText.
+                If no instance is found, `None` is returned.
+        """
+        if len(self.tree) == 0:
+            return None
+
+        items = [
+            (index, child)
+            for index, child in enumerate(self.tree)
+            if isinstance(child, cls)
+        ]
+
+        if multi:
+            return [child for _, child in items]
+
+        if len(items) == 0:
+            return None
+
+        if len(items) > 1:
+            # Too many, use `index` from `items` to find bad children,
+            # and replace with ErrorText
+            for index, child in items[:-1]:
+                self.tree[index] = ErrorText(
+                    child.render_raw(),
+                    reason="Extra {} tag".format(child.tag_name)
+                )
+
+        # Return the last defined
+        return items[-1][1]
+
     def render_children(self):
         """Return the rendering of child tags/text
         """
