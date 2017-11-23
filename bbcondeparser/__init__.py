@@ -26,7 +26,7 @@ from .html_tags import (
     HTMLText, BaseHTMLTag, BaseHTMLRenderTreeParser, HtmlSimpleTag,
     ParagraphTag)
 
-__version__ = '0.3.1'
+__version__ = '0.4.0'
 
 __all__ = [
     'BaseTag', 'RawText', 'ErrorText', 'SimpleTag', 'TagCategory',
