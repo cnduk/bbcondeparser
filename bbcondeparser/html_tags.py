@@ -551,7 +551,10 @@ class _BaseHTMLRenderTreeParser(object):
     def handle_renderable_text(self):
         if self.is_converting_paragraphs:
             if not self.is_inside_paragraph:
-                self.open_paragraph()
+                # We only want to open the paragraph if the text node is not
+                # only whitespace
+                if not self._node.text.isspace():
+                    self.open_paragraph()
             else:
                 self.append_paragraph(self._node)
 
