@@ -305,12 +305,22 @@ class _TreeParser(object):
         elif self.tag_cls.self_closing:
             # [] because self-closing tags contain no tree
             # "" beacuse self-closing tags don't have any end text
-            self.append_tree(self.tag_cls(
-                    self.token.attrs, [], self.token.text, ""))
+            inst = self.tag_cls(self.token.attrs, [], self.token.text, "")
+
+            if inst.errors:
+                self.append_err("; ".join(inst.errors))
+
+            else:
+                self.append_tree(inst)
 
         else:
+            # Check if the attrs are ok first. if not, it's an error!
+            _, errors = self.tag_cls.parse_attrs(self.token.attrs)
+            if errors:
+                self.append_err("; ".join(errors))
             # It's an open tag, so push onto the stack
-            self.stack_push()
+            else:
+                self.stack_push()
 
     def handle_close_token(self):
         open_for_index = self.stack.open_for_index(self.token)

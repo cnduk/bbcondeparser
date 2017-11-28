@@ -285,8 +285,7 @@ class BaseTag(BaseNode):
         self.start_text = start_text
         self.end_text = end_text
 
-        self.errors = []
-        self._parse_attrs(attrs)
+        self.attrs, self.errors = self.parse_attrs(attrs)
 
         for node in self.tree:
             if isinstance(node, BaseNode):
@@ -391,16 +390,18 @@ class BaseTag(BaseNode):
         """
         return ''.join(child.render_raw() for child in self.tree)
 
-    def _parse_attrs(self, attrs):
-        self.attrs = parsed_attrs = {}
+    @classmethod
+    def parse_attrs(cls, attrs):
+        parsed_attrs = {}
+        errors = []
 
         duplicate_keys = []
 
         for attr_key, attr_val in attrs:
-            attr_def = self.attr_defs.get(attr_key)
+            attr_def = cls.attr_defs.get(attr_key)
 
             if attr_def is None:
-                self.errors.append('got undefined attr {}'.format(attr_key))
+                errors.append('got undefined attr {}'.format(attr_key))
                 continue
 
             if attr_key in parsed_attrs:
@@ -410,7 +411,7 @@ class BaseTag(BaseNode):
                 try:
                     attr_val = attr_def['parser'](attr_val)
                 except ValueError as e:
-                    self.errors.append(
+                    errors.append(
                         'failed to parse attr {} with value {}: {}'.format(
                             attr_key, attr_val, e,
                         )
@@ -420,16 +421,19 @@ class BaseTag(BaseNode):
             parsed_attrs[attr_key] = attr_val
 
         for key in duplicate_keys:
-            self.errors.append('duplicate definition for key {}'.format(key))
+            errors.append('duplicate definition for key {}'.format(key))
 
-        for attr_key, attr_def in self.attr_defs.items():
+        for attr_key, attr_def in cls.attr_defs.items():
             if attr_key not in parsed_attrs:
                 try:
                     parsed_attrs[attr_key] = attr_def['default']
                 except KeyError:
-                    self.errors.append(
+                    errors.append(
                         'missing required attr {}'.format(attr_key)
                     )
+
+        return parsed_attrs, errors
+
 
 
 class RootTag(BaseTag):

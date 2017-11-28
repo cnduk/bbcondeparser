@@ -66,17 +66,19 @@ class TestParseTree(unittest.TestCase):
         class Tag1(MockBaseTag):
             self_closing = True
             tag_name = 'apples'
+            attr_defs = {'a': {}, 'b': {}}
 
         tags = [Tag1]
         input_text = r'[apples a="1" b="2" a="\" "]'
 
         expected_tree = RootTag({}, [
-            Tag1(
-                (('a', '1'), ('b', '2'), ('a', '" ')),
-                [],
-                r'[apples a="1" b="2" a="\" "]',
-                '',
-            ),
+            ErrorText(r'[apples a="1" b="2" a="\" "]'),
+#            Tag1(
+#                (('a', '1'), ('b', '2'), ('a', '" ')),
+#                [],
+#                r'[apples a="1" b="2" a="\" "]',
+#                '',
+#            ),
         ], '', '')
 
         result = tree_parser.parse_tree(input_text, tags)
@@ -484,6 +486,7 @@ class TestParseTree(unittest.TestCase):
 
         class Tag2(MockBaseTag):
             tag_name = 'b'
+            attr_defs = {'x': {}, 'y': {}}
 
         tags = [Tag1, Tag2]
 
