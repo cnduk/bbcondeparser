@@ -76,9 +76,3 @@ def find_next_multi_char(search_string, chars, start=0):
     )
 
     return min(matches) if matches else -1
-
-
-def strip_newlines(text, newline_char='\n'):
-    """Removes any newline characters from the text
-    """
-    return text.replace(newline_char, '')
