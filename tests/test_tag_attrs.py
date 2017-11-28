@@ -23,7 +23,7 @@ class MockTreeParser(tree_parser.BaseTreeParser):
     root_tag_class = MockRootTag
 
 
-class TestInvalidAttributes(unittest.TestCase):
+class TestAttributes(unittest.TestCase):
     def _test(self, input_text, expected_text, expected_tree, parser):
         inst = parser(input_text)
         result_text = inst.render()
@@ -156,6 +156,67 @@ class TestInvalidAttributes(unittest.TestCase):
             ], '[b]', '[/b]'),
             RawText('world'),
             ErrorText('[/d]'),
+        ], '', '')
+
+        self._test(input_text, expected_text, expected_tree, TestParser)
+
+    def test_default_value(self):
+        class TestTag(MockBaseTag):
+            tag_name = 'd'
+            attr_defs = {'a': {'default': '1'}}
+            def _render(self):
+                return '<d>' + self.attrs['a'] + '</d>'
+
+        class TestParser(MockTreeParser):
+            tags = [TestTag]
+
+        input_text = '[d]cheesecake is yummy[/d]'
+        expected_text = '<d>1</d>'
+        expected_tree = MockRootTag({}, [
+            TestTag([('d', '1')], [
+                RawText('cheesecake is yummy')
+            ], '[b]', '[/b]'),
+        ], '', '')
+
+        self._test(input_text, expected_text, expected_tree, TestParser)
+
+    def test_default_value_overriden(self):
+        class TestTag(MockBaseTag):
+            tag_name = 'd'
+            attr_defs = {'a': {'default': '1'}}
+            def _render(self):
+                return '<d>' + self.attrs['a'] + '</d>'
+
+        class TestParser(MockTreeParser):
+            tags = [TestTag]
+
+        input_text = '[d a="hello"]cheesecake is yummy[/d]'
+        expected_text = '<d>hello</d>'
+        expected_tree = MockRootTag({}, [
+            TestTag([('a', 'hello')], [
+                RawText('cheesecake is yummy')
+            ], '[b]', '[/b]'),
+        ], '', '')
+
+        self._test(input_text, expected_text, expected_tree, TestParser)
+
+    def test_default_value_none(self):
+        class TestTag(MockBaseTag):
+            tag_name = 'd'
+            attr_defs = {'a': {'default': None}}
+            self_closing = True
+            def _render(self):
+                if self.attrs['a'] is None:
+                    return 'success'
+                return 'fail'
+
+        class TestParser(MockTreeParser):
+            tags = [TestTag]
+
+        input_text = '[d]'
+        expected_text = 'success'
+        expected_tree = MockRootTag({}, [
+            TestTag([], [], '[b]', ''),
         ], '', '')
 
         self._test(input_text, expected_text, expected_tree, TestParser)
