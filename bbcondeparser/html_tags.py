@@ -378,6 +378,7 @@ class BaseHTMLRenderTreeParser(BaseTreeParser):
     raw_text_class = HTMLText
     newline_text_class = HTMLNewlineText
     root_tag_class = RootHTMLTag
+    paragraph_tag_class = ParagraphTag
     newline_behaviour = None
     convert_paragraphs = None
 
@@ -390,12 +391,15 @@ class BaseHTMLRenderTreeParser(BaseTreeParser):
             self.convert_paragraphs, convert_paragraphs)
 
         self.root_node = amend_tree(
-            self.root_node, newline_behaviour, convert_paragraphs)
+            self.root_node, newline_behaviour, convert_paragraphs,
+            self.paragraph_tag_class,
+        )
 
 
-def amend_tree(root_node, newline_behaviour=None, convert_paragraphs=None):
+def amend_tree(root_node, newline_behaviour=None, convert_paragraphs=None,
+               paragraph_tag_class=None):
     inst = _BaseHTMLRenderTreeParser(
-        root_node, newline_behaviour, convert_paragraphs)
+        root_node, newline_behaviour, convert_paragraphs, paragraph_tag_class)
     inst.amend_tree()
     return inst.root_node
 
@@ -434,12 +438,13 @@ class NodeStack(object):
 class _BaseHTMLRenderTreeParser(object):
 
     def __init__(self, root_node, newline_behaviour=None,
-                 convert_paragraphs=None):
+                 convert_paragraphs=None, paragraph_tag_class=None):
 
         self.root_node = root_node
         self.stack = NodeStack()
         self.newline_behaviour = newline_behaviour
         self.convert_paragraphs = convert_paragraphs
+        self.paragraph_tag_class = paragraph_tag_class or ParagraphTag
 
         self._inside_paragraph = False
         self._paragraph_tree = None
@@ -524,7 +529,8 @@ class _BaseHTMLRenderTreeParser(object):
 
         # When we create the ParagraphTag and assign the tree, waaay back in
         # BaseNode we are also assigning the parent to all of the children.
-        paragraph_node = ParagraphTag({}, self._paragraph_tree, '', '')
+        paragraph_node = self.paragraph_tag_class(
+            {}, self._paragraph_tree, '', '')
         self.append_tree(paragraph_node)
         self._paragraph_tree = None
         self._inside_paragraph = False
