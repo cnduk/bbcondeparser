@@ -421,3 +421,59 @@ class TestTokenParser(unittest.TestCase):
             token_parser.NewlineToken('\r', (3, 4)),
         ]
         self._testy(input_str, expected_tokens)
+
+
+class TestAttributeEdgeCases(unittest.TestCase):
+    def test_square_braces_in_attr(self):
+        input_str = '[a x="this [is] [valid]"]'
+        expected_tokens = [
+            token_parser.OpenTagToken(
+                '[a x="this [is] [valid]"]', (0, 25), 'a',
+                (('x', 'this [is] [valid]'),)
+            )
+        ]
+
+        actual_tokens = token_parser.get_tokens(input_str)
+        self.assertEqual(expected_tokens, actual_tokens)
+
+    def test_more_square_braces_in_attr(self):
+        input_str = r'hello![code src="this [i]is[/i] \"terrible\""]bye!'
+        expected_tokens = [
+            token_parser.TextToken('hello!', (0, 6)),
+            token_parser.OpenTagToken(
+                r'[code src="this [i]is[/i] \"terrible\""]', (6, 46), 'code',
+                (('src', 'this [i]is[/i] "terrible"'),),
+            ),
+            token_parser.TextToken('bye!', (46, 50)),
+        ]
+
+        actual_tokens = token_parser.get_tokens(input_str)
+        self.assertEqual(expected_tokens, actual_tokens)
+
+    def test_with_lots_of_backslashes(self):
+        input_str = r'''[a x=" \\\"\'\\ " y=' \\[]][\g\h\y\j\u\o\j\hy ']'''
+        expected_tokens = [
+            token_parser.OpenTagToken(
+                r'''[a x=" \\\"\'\\ " y=' \\[]][\g\h\y\j\u\o\j\hy ']''', (0, 48), 'a',
+                (
+                    ('x', r''' \"'\ '''),
+                    ('y', r''' \[]][ghyjuojhy '''),
+                )
+            )
+        ]
+
+        actual_tokens = token_parser.get_tokens(input_str)
+        self.assertEqual(expected_tokens, actual_tokens)
+
+    def test_real_world_example(self):
+        input_str = '[link url="http://bs.serving-sys.com/serving/adServer.bs?cn=trd&mc=click&pli=23095321&PluID=0&ord=[timestamp]"]'
+        expected_tokens = [
+            token_parser.OpenTagToken(
+                '[link url="http://bs.serving-sys.com/serving/adServer.bs?cn=trd&mc=click&pli=23095321&PluID=0&ord=[timestamp]"]',
+                (0, 111), 'link',
+                (('url', 'http://bs.serving-sys.com/serving/adServer.bs?cn=trd&mc=click&pli=23095321&PluID=0&ord=[timestamp]'), ),
+            )
+        ]
+
+        actual_tokens = token_parser.get_tokens(input_str)
+        self.assertEqual(expected_tokens, actual_tokens)

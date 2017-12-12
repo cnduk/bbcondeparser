@@ -236,13 +236,38 @@ class TokenParser(object):
 
         self.tokens.append(NewlineToken(char, location))
 
+    def _find_close_char(self):
+        # Find the close of the tag. If this is interrupted by
+        # another open tag, then mark this tag as being in error.
+        # However we can't just do "find next open or close char",
+        # because we might have a [ or ] in an attribute value
+        # e.g. [a x="[]"]. We need to scan until we find the second
+        # ] at the end.
+        quote_chr = None
+        i = self.curr_pos + 1
+        while i < len(self.text):
+            if quote_chr is not None:
+                if self.text[i] == '\\':
+                    i += 1 # skip the next character
+
+                elif self.text[i] == quote_chr:
+                    quote_chr = None
+
+            elif self.text[i] in '][':
+                return i
+
+            elif self.text[i] in '"\'':
+                quote_chr = self.text[i]
+
+            i += 1
+
+        return -1
+
     def parse_tag_token(self):
         assert self.text[self.curr_pos] == OPEN_CHAR
 
-        end_of_tag_loc = find_next_multi_char(
-                self.text, OPEN_CHAR+CLOSE_CHAR, self.curr_pos+1)
-
-        if end_of_tag_loc == -1 or self.text[end_of_tag_loc] == OPEN_CHAR:
+        end_of_tag_loc = self._find_close_char()
+        if end_of_tag_loc == -1 or self.text[end_of_tag_loc] != CLOSE_CHAR:
             if end_of_tag_loc == -1:
                 end_of_tag_loc = len(self.text)-1
             else:
