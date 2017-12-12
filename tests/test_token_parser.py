@@ -185,10 +185,18 @@ class TestParseTag(unittest.TestCase):
 
 
 class TestBaseToken(unittest.TestCase):
-    def test_repr(self):
+    def test_base_token_repr(self):
         # This is just to make sure it doesn't do anything silly,
         # Not too concerned with the exact form.
         token = token_parser.BaseToken('something', (1, 2))
+        repr(token)
+
+    def test_bad_syntax_repr(self):
+        token = token_parser.BadSyntaxToken('something', (1, 2), 'something')
+        repr(token)
+
+    def test_open_tag_repr(self):
+        token = token_parser.OpenTagToken('something', (0, 0), 'a', ())
         repr(token)
 
 

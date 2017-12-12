@@ -82,6 +82,14 @@ class BadSyntaxToken(BaseToken):
         super(BadSyntaxToken, self).__init__(text, location)
         self.reason = reason
 
+    def __repr__(self):
+        return '{}({}@{}:{})'.format(
+            self.__class__.__name__,
+            repr(getattr(self, 'text', '<UNINITIALIZED!!>')),
+            getattr(self, 'location', '<UNINITIALIZED!!>'),
+            getattr(self, 'reason', '<UNINITIALIZED!!>'),
+        )
+
 
 class NewlineToken(BaseToken):
     pass
