@@ -21,6 +21,7 @@
 from __future__ import unicode_literals
 
 from . import _six as six
+from .utils import calc_wordcount
 
 
 NEWLINE_STR = '\n'
@@ -45,6 +46,13 @@ class BaseNode(object):
     def _render(self):
         raise NotImplementedError
 
+    @property
+    def wordcount(self):
+        return self._wordcount()
+
+    def _wordcount(self):
+        return 0
+
 
 class BaseText(BaseNode):
     def __init__(self, text):
@@ -65,10 +73,9 @@ class BaseText(BaseNode):
 
 
 class RawText(BaseText):
-    """This class is to hold chunks of plain text.
-        handles escaping html within the text.
-    """
-    pass
+    """This class is to hold chunks of plain text."""
+    def _wordcount(self):
+        return calc_wordcount(self.render())
 
 
 class NewlineText(BaseText):
@@ -89,10 +96,8 @@ class NewlineText(BaseText):
         return NEWLINE_STR if self.count == 1 else self.DOUBLE_NEWLINE
 
 
-class ErrorText(BaseText):
-    """This class is to hold source text which could not be parsed.
-        handles escaping html within the text.
-    """
+class ErrorText(RawText):
+    """This class is to hold source text which could not be parsed."""
     def __init__(self, text, reason=None):
         """`text` - the invalid text from the markup source
             `reason` - why the source text was considered invalid
@@ -390,6 +395,12 @@ class BaseTag(BaseNode):
         """
         return ''.join(child.render_raw() for child in self.tree)
 
+    def _wordcount(self):
+        return sum(
+            child.wordcount
+            for child in self.tree
+        )
+
     @classmethod
     def parse_attrs(cls, attrs):
         parsed_attrs = {}
@@ -456,6 +467,13 @@ class SimpleTag(BaseTag):
         return self.template.replace(
             self.replace_text, self.render_children()
         )
+
+    def _wordcount(self):
+        wordcount = super(SimpleTag, self)._wordcount()
+        wordcount += calc_wordcount(
+            self.template.replace(self.replace_text, '')
+        )
+        return wordcount
 
 
 def parse_tag_set(tag_set):

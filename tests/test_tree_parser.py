@@ -2,7 +2,7 @@ import unittest
 
 from bbcondeparser.tags import (
     RawText, ErrorText, BaseTag, BaseText, NewlineText, TagCategory,
-    RootTag,
+    RootTag, SimpleTag,
 )
 from bbcondeparser import tree_parser
 
@@ -723,3 +723,24 @@ class TestTreeParserContext(unittest.TestCase):
         })
 
         self.assertEqual(expected_text, result_text)
+
+
+class TestWordCount(unittest.TestCase):
+    def test_wordcount(self):
+        class MySimple(SimpleTag):
+            tag_name = 'a'
+            template = 'this adds {} four words'.format(SimpleTag.replace_text)
+
+        class UpperCase(BaseTag):
+            tag_name = 'b'
+            def _render(self):
+                return self.render_children().upper()
+
+        class TestParser(tree_parser.BaseTreeParser):
+            tags = [MySimple, UpperCase]
+
+        input_text = "[a]#winning[/a] [b]all of the things [a]today[/a][/b]"
+
+        inst = TestParser(input_text)
+
+        self.assertEqual(inst.wordcount, 14)

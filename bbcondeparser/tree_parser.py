@@ -83,6 +83,10 @@ class BaseTreeParser(object):
     def pretty_format(self):
         return self.root_node.pretty_format()
 
+    @property
+    def wordcount(self):
+        return self.root_node.wordcount
+
 
 StackLevel = namedtuple(
     'TreeParserStackLevel',

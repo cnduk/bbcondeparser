@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import unittest
 
 from bbcondeparser import tags
@@ -155,3 +156,80 @@ class TestNewlineTextRender(unittest.TestCase):
         test_newline.add_newline(tags.NEWLINE_STR)
         test_newline.add_newline(tags.NEWLINE_STR)
         self.assertEqual(test_newline.render(), tags.NEWLINE_STR*2)
+
+
+class TestRawTextWordCount(unittest.TestCase):
+    def test_rawtext_wordcount(self):
+        inst = tags.RawText(u"this should become 5 words")
+        self.assertEqual(inst.wordcount, 5)
+
+    def test_some_punctuation(self):
+        inst = tags.RawText(u"didn't you know hyponated-words count as one?")
+        self.assertEqual(inst.wordcount, 7)
+
+    def test_more_punctuation(self):
+        inst = tags.RawText(
+            u"""I'm going to put some "quotation" 'marks' and into this !"""
+            """and some , spaces  between  some things ; punction . !! !"""
+        )
+        self.assertEqual(inst.wordcount, 17)
+
+    def test_tabs(self):
+        inst = tags.RawText(u'this\tuses\ttabs\t')
+        self.assertEqual(inst.wordcount, 3)
+
+    def test_missing_spaces_more(self):
+        inst = tags.RawText(u"this.is.missing.spaces")
+        self.assertEqual(inst.wordcount, 4)
+
+    def test_unicode(self):
+        inst = tags.RawText(u"æÞß 🍔 burgers for £100.")
+        # emoji don't count as words
+        self.assertEqual(inst.wordcount, 4)
+
+
+class TestBaseNodeWordCount(unittest.TestCase):
+    def test_no_children(self):
+        class MyTag(tags.BaseTag):
+            tag_name = 'a'
+            pass
+        inst = MyTag((), [], '[a]', '[/a]')
+        self.assertEqual(inst.wordcount, 0)
+
+    def test_some_children(self):
+        # MC = MockWordCountChild
+        class MC(object):
+            def __init__(self, n):
+                self.wordcount = n
+
+        class MyTag(tags.BaseTag):
+            tag_name = 'a'
+            pass
+
+        inst = MyTag((), [MC(5), MC(10), MC(0)], '[a]', '[/a]')
+        self.assertEqual(inst.wordcount, 15)
+
+
+class TestSimpleTagWordCount(unittest.TestCase):
+    def test_no_children(self):
+        class MySimpleTag(tags.SimpleTag):
+            tag_name = 'a'
+            template = 'all of the {} butts'.format(tags.SimpleTag.replace_text)
+
+        inst = MySimpleTag((), [], '[a]', '[/a]')
+        self.assertEqual(inst.wordcount, 4)
+
+    def test_with_some_children(self):
+        # MC = MockWordCountChild
+        class MC(object):
+            def __init__(self, n):
+                self.wordcount = n
+
+        class MySimpleTag(tags.SimpleTag):
+            tag_name = 'a'
+            template = 'this is my content : {}, did you like it?'.format(
+                    tags.SimpleTag.replace_text)
+
+        inst = MySimpleTag((), [MC(4), MC(0), MC(10)], '[a]', '[/a]')
+        self.assertEqual(inst.wordcount, 22)
+

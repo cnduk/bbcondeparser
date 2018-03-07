@@ -76,3 +76,8 @@ def find_next_multi_char(search_string, chars, start=0):
     )
 
     return min(matches) if matches else -1
+
+_WORDS_RE = re.compile("[\w](?:['-]?[\w])*", re.U)
+def calc_wordcount(text):
+    all = _WORDS_RE.findall(text.strip())
+    return len(all)
