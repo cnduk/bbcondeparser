@@ -468,13 +468,6 @@ class SimpleTag(BaseTag):
             self.replace_text, self.render_children()
         )
 
-    def _wordcount(self):
-        wordcount = super(SimpleTag, self)._wordcount()
-        wordcount += calc_wordcount(
-            self.template.replace(self.replace_text, '')
-        )
-        return wordcount
-
 
 def parse_tag_set(tag_set):
     """Tag sets are iterables of BaseTag subclasses and TagCategories

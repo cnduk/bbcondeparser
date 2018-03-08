@@ -217,7 +217,7 @@ class TestSimpleTagWordCount(unittest.TestCase):
             template = 'all of the {} butts'.format(tags.SimpleTag.replace_text)
 
         inst = MySimpleTag((), [], '[a]', '[/a]')
-        self.assertEqual(inst.wordcount, 4)
+        self.assertEqual(inst.wordcount, 0)
 
     def test_with_some_children(self):
         # MC = MockWordCountChild
@@ -231,5 +231,5 @@ class TestSimpleTagWordCount(unittest.TestCase):
                     tags.SimpleTag.replace_text)
 
         inst = MySimpleTag((), [MC(4), MC(0), MC(10)], '[a]', '[/a]')
-        self.assertEqual(inst.wordcount, 22)
+        self.assertEqual(inst.wordcount, 14)
 

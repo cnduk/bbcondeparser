@@ -743,4 +743,4 @@ class TestWordCount(unittest.TestCase):
 
         inst = TestParser(input_text)
 
-        self.assertEqual(inst.wordcount, 14)
+        self.assertEqual(inst.wordcount, 6)
