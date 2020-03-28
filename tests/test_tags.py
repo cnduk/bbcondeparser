@@ -155,3 +155,45 @@ class TestNewlineTextRender(unittest.TestCase):
         test_newline.add_newline(tags.NEWLINE_STR)
         test_newline.add_newline(tags.NEWLINE_STR)
         self.assertEqual(test_newline.render(), tags.NEWLINE_STR*2)
+
+
+class TestTagWalkTree(unittest.TestCase):
+    def test_no_children(self):
+        test_tag = tags.BaseTag({}, [], '', '')
+        test_children = list(test_tag.walk_tree())
+        self.assertEqual(test_children, [])
+
+    def test_simple_children(self):
+        a_tag = tags.BaseTag({}, [], 'a', 'a')
+        b_tag = tags.BaseTag({}, [], '', '')
+        c_tag = tags.BaseTag({}, [], '', '')
+        parent_tag = tags.BaseTag({}, [a_tag, b_tag, c_tag], '', '')
+        test_children = list(parent_tag.walk_tree())
+        self.assertEqual(test_children, [a_tag, b_tag, c_tag])
+
+    def test_nested_children(self):
+        a_a_tag = tags.BaseTag({}, [], '', '')
+        a_b_tag = tags.BaseTag({}, [], '', '')
+        a_tag = tags.BaseTag({}, [a_a_tag, a_b_tag], '', '')
+
+        b_a_a_tag = tags.BaseTag({}, [], '', '')
+        b_a_b_tag = tags.BaseTag({}, [], '', '')
+        b_a_tag = tags.BaseTag({}, [b_a_a_tag, b_a_b_tag], '', '')
+        b_b_tag = tags.BaseTag({}, [], '', '')
+        b_c_tag = tags.BaseTag({}, [], '', '')
+        b_tag = tags.BaseTag({}, [b_a_tag, b_b_tag, b_c_tag], '', '')
+
+        parent_tag = tags.BaseTag({}, [a_tag, b_tag], '', '')
+        test_children = list(parent_tag.walk_tree())
+        expected_children = [
+            a_tag,
+            a_a_tag,
+            a_b_tag,
+            b_tag,
+            b_a_tag,
+            b_a_a_tag,
+            b_a_b_tag,
+            b_b_tag,
+            b_c_tag,
+        ]
+        self.assertEqual(test_children, expected_children)

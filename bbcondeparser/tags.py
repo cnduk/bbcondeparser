@@ -371,6 +371,15 @@ class BaseTag(BaseNode):
         # Return the last defined
         return items[-1][1]
 
+    def walk_tree(self):
+        """Iterate and yield through each child of the tree and recursively
+            iterate through their children.
+        """
+        for child in self.tree:
+            yield child
+            for smaller_child in child.walk_tree():
+                yield smaller_child
+
     def render_children(self):
         """Return the rendering of child tags/text
         """
