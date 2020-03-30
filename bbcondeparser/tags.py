@@ -377,8 +377,9 @@ class BaseTag(BaseNode):
         """
         for child in self.tree:
             yield child
-            for smaller_child in child.walk_tree():
-                yield smaller_child
+            if isinstance(child, BaseTag):
+                for smaller_child in child.walk_tree():
+                    yield smaller_child
 
     def render_children(self):
         """Return the rendering of child tags/text

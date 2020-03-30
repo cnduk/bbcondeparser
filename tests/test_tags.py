@@ -197,3 +197,19 @@ class TestTagWalkTree(unittest.TestCase):
             b_c_tag,
         ]
         self.assertEqual(test_children, expected_children)
+
+    def test_allow_text_nodes(self):
+        text_tag = tags.BaseText('words')
+        a_a_tag = tags.BaseTag({}, [text_tag], '', '')
+        a_b_tag = tags.BaseTag({}, [], '', '')
+        a_tag = tags.BaseTag({}, [a_a_tag, a_b_tag], '', '')
+
+        parent_tag = tags.BaseTag({}, [a_tag], '', '')
+        test_children = list(parent_tag.walk_tree())
+        expected_children = [
+            a_tag,
+            a_a_tag,
+            text_tag,
+            a_b_tag,
+        ]
+        self.assertEqual(test_children, expected_children)
