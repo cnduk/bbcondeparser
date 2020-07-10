@@ -18,18 +18,29 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from .tags import (
-    BaseTag, RawText, ErrorText, SimpleTag, TagCategory,
-)
-from .tree_parser import BaseTreeParser
 from .html_tags import (
-    HTMLText, BaseHTMLTag, BaseHTMLRenderTreeParser, HtmlSimpleTag,
-    ParagraphTag)
+    BaseHTMLRenderTreeParser,
+    BaseHTMLTag,
+    HtmlSimpleTag,
+    HTMLText,
+    ParagraphTag,
+)
+from .tags import BaseTag, ErrorText, RawText, SimpleTag, TagCategory
+from .tree_parser import BaseTreeParser
 
-__version__ = '1.1.1'
+__version__ = "1.1.1"
 
 __all__ = [
-    'BaseTag', 'RawText', 'ErrorText', 'SimpleTag', 'TagCategory',
-    'BaseTreeParser', 'HTMLText', 'BaseHTMLTag', 'HtmlSimpleTag',
-    'BaseHTMLRenderTreeParser', 'ParagraphTag', '__version__',
+    "BaseTag",
+    "RawText",
+    "ErrorText",
+    "SimpleTag",
+    "TagCategory",
+    "BaseTreeParser",
+    "HTMLText",
+    "BaseHTMLTag",
+    "HtmlSimpleTag",
+    "BaseHTMLRenderTreeParser",
+    "ParagraphTag",
+    "__version__",
 ]

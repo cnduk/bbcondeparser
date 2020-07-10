@@ -19,38 +19,40 @@
 # SOFTWARE.
 
 import re
-from collections import Mapping
+from collections.abc import Mapping
 
 from bbcondeparser.utils import (
-    to_unicode, remove_backslash_escapes, find_next_multi_char,
     add_backslash_escapes,
+    find_next_multi_char,
+    remove_backslash_escapes,
 )
 
-OPEN_CHAR = u'['
-CLOSE_CHAR = u']'
+OPEN_CHAR = "["
+CLOSE_CHAR = "]"
 
 # N.B. This creates a unicode/string!
 NEWLINE_CHARS = (
-    '\n' # LF - Line Feed
-    '\r' # CR - Carriage Return
-    '\v' # VT - Vertical Tab
-    '\f' # FF - Form Feed
-    u'\u2029' # Paragraph separator
-    u'\u2028' # Line separator
+    "\n"  # LF - Line Feed
+    "\r"  # CR - Carriage Return
+    "\v"  # VT - Vertical Tab
+    "\f"  # FF - Form Feed
+    "\u2029"  # Paragraph separator
+    "\u2028"  # Line separator
     # u'\u0085' # NEL - NExt Line. Ignored because it's not common,
-                # and Windows uses it as an elipsis.
+    # and Windows uses it as an elipsis.
     # DOS newlines \r\n are special cased in the parser.
 )
 
 
 def get_tokens(text):
-    parser= TokenParser(text)
+    parser = TokenParser(text)
     return parser.tokens
 
 
 class BaseToken(object):
     """An object to represent a token within the source text
     """
+
     def __init__(self, text, location):
         """loc is the location in the text the token is from.
             It is given to this class to make it accesible later on,
@@ -61,16 +63,18 @@ class BaseToken(object):
         self.location = location
 
     def __repr__(self):
-        return '{}({}@{})'.format(
+        return "{}({}@{})".format(
             self.__class__.__name__,
-            repr(getattr(self, 'text', '<UNINITIALIZED!!>')),
-            getattr(self, 'location', '<UNINITIALIZED!!>'),
+            repr(getattr(self, "text", "<UNINITIALIZED!!>")),
+            getattr(self, "location", "<UNINITIALIZED!!>"),
         )
 
     def __eq__(self, other):
-        return self.__class__ is other.__class__ \
-                and self.text == other.text \
-                and self.location == other.location
+        return (
+            self.__class__ is other.__class__
+            and self.text == other.text
+            and self.location == other.location
+        )
 
 
 class TextToken(BaseToken):
@@ -83,11 +87,11 @@ class BadSyntaxToken(BaseToken):
         self.reason = reason
 
     def __repr__(self):
-        return '{}({}@{}:{})'.format(
+        return "{}({}@{}:{})".format(
             self.__class__.__name__,
-            repr(getattr(self, 'text', '<UNINITIALIZED!!>')),
-            getattr(self, 'location', '<UNINITIALIZED!!>'),
-            getattr(self, 'reason', '<UNINITIALIZED!!>'),
+            repr(getattr(self, "text", "<UNINITIALIZED!!>")),
+            getattr(self, "location", "<UNINITIALIZED!!>"),
+            getattr(self, "reason", "<UNINITIALIZED!!>"),
         )
 
 
@@ -102,18 +106,20 @@ class OpenTagToken(BaseToken):
         self.attrs = attrs
 
     def __repr__(self):
-        return '{}({}@{}<{}@{}>)'.format(
+        return "{}({}@{}<{}@{}>)".format(
             self.__class__.__name__,
-            repr(getattr(self, 'text', '<UNINITIALIZED!!>')),
-            getattr(self, 'location', '<UNINITIALIZED!!>'),
-            getattr(self, 'tag_name', '<UNINITIALIZED!!>'),
-            getattr(self, 'attrs', '<UNINITIALIZED!!>'),
+            repr(getattr(self, "text", "<UNINITIALIZED!!>")),
+            getattr(self, "location", "<UNINITIALIZED!!>"),
+            getattr(self, "tag_name", "<UNINITIALIZED!!>"),
+            getattr(self, "attrs", "<UNINITIALIZED!!>"),
         )
 
     def __eq__(self, other):
-        return super(OpenTagToken, self).__eq__(other) \
-            and self.tag_name == other.tag_name \
+        return (
+            super(OpenTagToken, self).__eq__(other)
+            and self.tag_name == other.tag_name
             and self.attrs == other.attrs
+        )
 
     @classmethod
     def generate_token(cls, start_location, tag_name, attrs):
@@ -131,28 +137,25 @@ class OpenTagToken(BaseToken):
                     of length 2). This function handles escaping.
                     will also accept a dict, (will order attrs)
         """
-        tag_name = to_unicode(tag_name)
 
         if not attrs:
-            attr_text = ''
+            attr_text = ""
 
         else:
             if isinstance(attrs, (dict, Mapping)):
                 attrs = sorted(attrs.items())
 
-            attrs = tuple((
-                (to_unicode(str(name)), to_unicode(str(val)))
-                for name, val in attrs
-            ))
-
-            # need to put a space between the name and the attrs
-            attr_text = ' ' + ' '.join(
-                '{}="{}"'.format(k, add_backslash_escapes(v))
-                for k, v in attrs
+            attrs = tuple(
+                ((str(name), str(val)) for name, val in attrs)
             )
 
-        text = '[' + tag_name + attr_text + ']'
-        location = (start_location, start_location+len(text))
+            # need to put a space between the name and the attrs
+            attr_text = " " + " ".join(
+                '{}="{}"'.format(k, add_backslash_escapes(v)) for k, v in attrs
+            )
+
+        text = "[" + tag_name + attr_text + "]"
+        location = (start_location, start_location + len(text))
         return cls(text, location, tag_name, attrs)
 
 
@@ -162,14 +165,15 @@ class CloseTagToken(BaseToken):
         self.tag_name = tag_name
 
     def __eq__(self, other):
-        return super(CloseTagToken, self).__eq__(other) \
-            and self.tag_name == other.tag_name
+        return (
+            super(CloseTagToken, self).__eq__(other) and self.tag_name == other.tag_name
+        )
 
 
 class TokenParser(object):
     def __init__(self, raw_text):
         self.original_text = raw_text
-        self.text = to_unicode(raw_text)
+        self.text = raw_text
 
         self.parse_tokens()
 
@@ -181,8 +185,7 @@ class TokenParser(object):
 
         while self.curr_pos < len(self.text):
             self.last_pos = self.curr_pos
-            self.curr_pos = find_next_multi_char(
-                    self.text, search_chars, self.curr_pos)
+            self.curr_pos = find_next_multi_char(self.text, search_chars, self.curr_pos)
 
             # If we've moved past characters other than our search characters,
             # Then that's just plain text.
@@ -207,31 +210,33 @@ class TokenParser(object):
             self.curr_pos += 1
 
     def add_text_token(self):
-        self.tokens.append(TextToken(
-            self.text[self.last_pos:self.curr_pos],
-            (self.last_pos, self.curr_pos),
-        ))
+        self.tokens.append(
+            TextToken(
+                self.text[self.last_pos : self.curr_pos],
+                (self.last_pos, self.curr_pos),
+            )
+        )
 
     def process_newline(self):
         assert self.text[self.curr_pos] in NEWLINE_CHARS
 
         char = self.text[self.curr_pos]
-        location = (self.curr_pos, self.curr_pos+1)
+        location = (self.curr_pos, self.curr_pos + 1)
 
         # either it's a dos newline \r\n, so need to consume two characters,
         # or it's just a single \n, \r or a newfangled unicode character.
         # Note \n\r is not a dos newline, it is a 'nix and mac newline.
-        if char == '\r':
+        if char == "\r":
             try:
-                next_char = self.text[self.curr_pos+1]
+                next_char = self.text[self.curr_pos + 1]
             except IndexError:
                 next_char = None
 
-            if next_char == '\n':
+            if next_char == "\n":
                 # woo we've found a dos newline! so consume the next
                 # character as well.
                 char += next_char
-                location = (self.curr_pos, self.curr_pos+2)
+                location = (self.curr_pos, self.curr_pos + 2)
                 self.curr_pos += 1
 
         self.tokens.append(NewlineToken(char, location))
@@ -247,16 +252,16 @@ class TokenParser(object):
         i = self.curr_pos + 1
         while i < len(self.text):
             if quote_chr is not None:
-                if self.text[i] == '\\':
-                    i += 1 # skip the next character
+                if self.text[i] == "\\":
+                    i += 1  # skip the next character
 
                 elif self.text[i] == quote_chr:
                     quote_chr = None
 
-            elif self.text[i] in '][':
+            elif self.text[i] in "][":
                 return i
 
-            elif self.text[i] in '"\'':
+            elif self.text[i] in "\"'":
                 quote_chr = self.text[i]
 
             i += 1
@@ -269,14 +274,14 @@ class TokenParser(object):
         end_of_tag_loc = self._find_close_char()
         if end_of_tag_loc == -1 or self.text[end_of_tag_loc] != CLOSE_CHAR:
             if end_of_tag_loc == -1:
-                end_of_tag_loc = len(self.text)-1
+                end_of_tag_loc = len(self.text) - 1
             else:
                 # Need to step back a character so that the OPEN_CHAR will
                 # be processed by the main loop
                 end_of_tag_loc -= 1
 
             recover_offset = salvage_tag_offset(
-                self.text[self.curr_pos:end_of_tag_loc+1]
+                self.text[self.curr_pos : end_of_tag_loc + 1]
             )
             # Backtrack so that the main loop can process the
             # leftover text. N.B. recover_offset is the location
@@ -286,52 +291,54 @@ class TokenParser(object):
             # pointing to the last character consumed)
             end_of_tag_loc = (self.curr_pos + recover_offset) - 1
 
-            self.tokens.append(BadSyntaxToken(
-                self.text[self.curr_pos:end_of_tag_loc+1],
-                (self.curr_pos, end_of_tag_loc+1),
-                "Missing tag closing character",
-            ))
+            self.tokens.append(
+                BadSyntaxToken(
+                    self.text[self.curr_pos : end_of_tag_loc + 1],
+                    (self.curr_pos, end_of_tag_loc + 1),
+                    "Missing tag closing character",
+                )
+            )
 
         else:
-            tag_text = self.text[self.curr_pos:end_of_tag_loc+1]
-            tag_location = (self.curr_pos, end_of_tag_loc+1)
+            tag_text = self.text[self.curr_pos : end_of_tag_loc + 1]
+            tag_location = (self.curr_pos, end_of_tag_loc + 1)
             tag_info = parse_tag(tag_text)
 
             if tag_info is None:
-                self.tokens.append(BadSyntaxToken(
-                    tag_text, tag_location, "Bad tag syntax"
-                ))
+                self.tokens.append(
+                    BadSyntaxToken(tag_text, tag_location, "Bad tag syntax")
+                )
 
             else:
                 tag_type, tag_name, tag_attrs = tag_info
 
-                if tag_type == 'open_tag':
-                    self.tokens.append(OpenTagToken(
-                        tag_text, tag_location, tag_name, tag_attrs
-                    ))
+                if tag_type == "open_tag":
+                    self.tokens.append(
+                        OpenTagToken(tag_text, tag_location, tag_name, tag_attrs)
+                    )
 
-                else: # tag_type == 'close_tag'
-                    self.tokens.append(CloseTagToken(
-                        tag_text, tag_location, tag_name
-                    ))
+                else:  # tag_type == 'close_tag'
+                    self.tokens.append(CloseTagToken(tag_text, tag_location, tag_name))
 
         self.curr_pos = end_of_tag_loc
 
 
-_whitespace_re = re.compile('\s+')
+_whitespace_re = re.compile(r"\s+")
 
-_tag_name_re_str = '[\w-]+'
+_tag_name_re_str = r"[\w-]+"
 _attr_re_str = r'([a-zA-Z-]+)=("(?:[^\\"]|\\.)*"|\'(?:[^\\\']|\\.)*\')'
-_attrs_re_str = r'^(?:\s*{_attr_re_str}\s*)*$'.format(**locals())
+_attrs_re_str = r"^(?:\s*{_attr_re_str}\s*)*$".format(**locals())
 
-_close_tag_re = re.compile('^/({_tag_name_re_str})\s*$'.format(**locals()))
-_start_tag_name_re = re.compile('^{_tag_name_re_str}$'.format(**locals()))
+_close_tag_re = re.compile(r"^/({_tag_name_re_str})\s*$".format(**locals()))
+_start_tag_name_re = re.compile(r"^{_tag_name_re_str}$".format(**locals()))
 
 _attr_re = re.compile(_attr_re_str)
 _attrs_re = re.compile(_attrs_re_str)
 
 _salvage_re = re.compile(
-        r'(\[/?(:?{_tag_name_re_str}(\s{_attr_re_str})*)?)'.format(**locals()))
+    r"(\[/?(:?{_tag_name_re_str}(\s{_attr_re_str})*)?)".format(**locals())
+)
+
 
 def salvage_tag_offset(text):
     """`text` should be everything from the OPEN_CHAR
@@ -375,13 +382,13 @@ def parse_tag(text):
     assert text[0] == OPEN_CHAR and text[-1] == CLOSE_CHAR
     text = text[1:-1]
 
-    if not text: # tag was empty (e.g. [])
+    if not text:  # tag was empty (e.g. [])
         return None
 
-    if text[0] == '/': # It's a close tag e.g. [/foo]
+    if text[0] == "/":  # It's a close tag e.g. [/foo]
         match = _close_tag_re.match(text)
         if match:
-            return ('close_tag', match.groups()[0], None)
+            return ("close_tag", match.groups()[0], None)
         else:
             return None
 
@@ -390,7 +397,7 @@ def parse_tag(text):
     # or [tagname<whitespace>] -> (tagname, '')
     parts = _whitespace_re.split(text, maxsplit=1)
     tag_name = parts[0]
-    attrs_str = parts[1] if len(parts) == 2 else ''
+    attrs_str = parts[1] if len(parts) == 2 else ""
 
     if not (_start_tag_name_re.match(tag_name) and _attrs_re.match(attrs_str)):
         return None
@@ -400,4 +407,4 @@ def parse_tag(text):
         for attr_name, attr_val in _attr_re.findall(attrs_str)
     )
 
-    return ('open_tag', tag_name, attr_vals)
+    return ("open_tag", tag_name, attr_vals)

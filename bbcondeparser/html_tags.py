@@ -19,24 +19,26 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from __future__ import unicode_literals
-
-import cgi
 from collections import namedtuple
-
-from . import _six as six
+from html import escape
 
 from .tags import (
-    BaseNode, RawText, BaseTagMeta, BaseTag, NewlineText, ErrorText, RootTag)
+    BaseNode,
+    BaseTag,
+    BaseTagMeta,
+    ErrorText,
+    NewlineText,
+    RawText,
+    RootTag,
+)
 from .tree_parser import BaseTreeParser
 
-
-HTML_NEWLINE = '<br />'
+HTML_NEWLINE = "<br />"
 NEWLINE_BEHAVIOURS = {
     None: 0,
-    'convert': 1,
-    'ignore': 2,
-    'remove': 3,
+    "convert": 1,
+    "ignore": 2,
+    "remove": 3,
 }
 PARAGRAPH_BEHAVIOURS = {
     None: 0,
@@ -55,7 +57,7 @@ def is_inline_tag(tag):
     Returns:
         bool: is it inline?
     """
-    return getattr(tag, 'tag_display', None) == 'inline'
+    return getattr(tag, "tag_display", None) == "inline"
 
 
 def is_block_tag(tag):
@@ -67,7 +69,7 @@ def is_block_tag(tag):
     Returns:
         bool: is it block?
     """
-    return getattr(tag, 'tag_display', None) == 'block'
+    return getattr(tag, "tag_display", None) == "block"
 
 
 def escape_html(text):
@@ -79,7 +81,7 @@ def escape_html(text):
     Returns:
         str: the escaped text
     """
-    return cgi.escape(text, quote=True)
+    return escape(text)
 
 
 class HTMLNewlineText(NewlineText):
@@ -87,24 +89,24 @@ class HTMLNewlineText(NewlineText):
 
     def __init__(self, *args, **kwargs):
         super(HTMLNewlineText, self).__init__(*args, **kwargs)
-        self.render_mode = 'html'
+        self.render_mode = "html"
 
     def set_html(self):
-        self.render_mode = 'html'
+        self.render_mode = "html"
 
     def set_raw(self):
-        self.render_mode = 'raw'
+        self.render_mode = "raw"
 
     def set_ignore(self):
-        self.render_mode = 'ignore'
+        self.render_mode = "ignore"
 
     def _render(self):
-        if self.render_mode == 'html':
-            return '<br />'
-        elif self.render_mode == 'raw':
+        if self.render_mode == "html":
+            return "<br />"
+        elif self.render_mode == "raw":
             return self.render_raw()
         else:
-            return ''
+            return ""
 
 
 class HTMLText(RawText):
@@ -145,18 +147,21 @@ class BaseHTMLTagMeta(BaseTagMeta):
             ValueError: if some values are set and shouldnt
         """
         if tag_cls.newline_behaviour not in NEWLINE_BEHAVIOURS:
-            raise ValueError('newline_behaviour must be one of {}'.format(
-                NEWLINE_BEHAVIOURS))
+            raise ValueError(
+                "newline_behaviour must be one of {}".format(NEWLINE_BEHAVIOURS)
+            )
 
         if is_inline_tag(tag_cls) and tag_cls.convert_paragraphs:
             raise ValueError(
                 "Cannot enable convert_paragraphs "
-                "on inline tag {tag_cls.tag_name}".format(tag_cls=tag_cls))
+                "on inline tag {tag_cls.tag_name}".format(tag_cls=tag_cls)
+            )
 
         if not is_inline_tag(tag_cls) and not is_block_tag(tag_cls):
             raise ValueError(
                 "Unknown tag display type: {tag_cls.tag_type}"
-                "on {tag_cls.tag_name}".format(tag_cls=tag_cls))
+                "on {tag_cls.tag_name}".format(tag_cls=tag_cls)
+            )
 
 
 def get_newline_behaviour(current_value, new_value):
@@ -229,17 +234,14 @@ def apply_ctx(new_ctx, src_ctx):
         if ctx_key in new_ctx:
             current_value = new_ctx[ctx_key]
 
-            if ctx_key == 'convert_paragraphs':
-                new_ctx[ctx_key] = get_convert_paragraphs(
-                    current_value, ctx_value)
+            if ctx_key == "convert_paragraphs":
+                new_ctx[ctx_key] = get_convert_paragraphs(current_value, ctx_value)
 
-            elif ctx_key == 'trim_whitespace':
-                new_ctx[ctx_key] = get_trim_whitespace(
-                    current_value, ctx_value)
+            elif ctx_key == "trim_whitespace":
+                new_ctx[ctx_key] = get_trim_whitespace(current_value, ctx_value)
 
-            elif ctx_key == 'newline_behaviour':
-                new_ctx[ctx_key] = get_newline_behaviour(
-                    current_value, ctx_value)
+            elif ctx_key == "newline_behaviour":
+                new_ctx[ctx_key] = get_newline_behaviour(current_value, ctx_value)
 
             else:
                 new_ctx[ctx_key] = ctx_value
@@ -250,8 +252,7 @@ def apply_ctx(new_ctx, src_ctx):
     return new_ctx
 
 
-@six.add_metaclass(BaseHTMLTagMeta)
-class BaseHTMLTag(BaseTag):
+class BaseHTMLTag(BaseTag, metaclass=BaseHTMLTagMeta):
     """BaseHTMLTag, used for all HTML tags.
 
     Attributes:
@@ -264,7 +265,7 @@ class BaseHTMLTag(BaseTag):
             be True, False or None.
     """
 
-    tag_display = 'inline'
+    tag_display = "inline"
     newline_behaviour = None
     convert_paragraphs = None
     trim_whitespace = None
@@ -284,8 +285,8 @@ class BaseHTMLTag(BaseTag):
         return apply_ctx(
             super(BaseHTMLTag, self).get_context().copy(),
             {
-                'newline_behaviour': self.newline_behaviour,
-                'convert_paragraphs': self.convert_paragraphs,
+                "newline_behaviour": self.newline_behaviour,
+                "convert_paragraphs": self.convert_paragraphs,
             },
         )
 
@@ -305,7 +306,7 @@ class HtmlSimpleTag(BaseHTMLTag):
     """
 
     template = None
-    replace_text = '{{ body }}'
+    replace_text = "{{ body }}"
     convert_paragraphs = False
 
     def _render(self):
@@ -319,13 +320,13 @@ class HtmlSimpleTag(BaseHTMLTag):
 
 
 class ParagraphTag(BaseHTMLTag):
-    tag_name = 'p'
+    tag_name = "p"
     # It is block but has the behaviour of an inline
-    tag_display = 'inline'
+    tag_display = "inline"
     convert_paragraphs = False
 
     def _render(self):
-        return '<p>{children}</p>'.format(children=self.render_children())
+        return "<p>{children}</p>".format(children=self.render_children())
 
 
 class BaseHTMLRenderTreeParser(BaseTreeParser):
@@ -386,33 +387,44 @@ class BaseHTMLRenderTreeParser(BaseTreeParser):
         super(BaseHTMLRenderTreeParser, self).__init__(text)
 
         newline_behaviour = get_newline_behaviour(
-            self.newline_behaviour, newline_behaviour)
+            self.newline_behaviour, newline_behaviour
+        )
         convert_paragraphs = get_convert_paragraphs(
-            self.convert_paragraphs, convert_paragraphs)
+            self.convert_paragraphs, convert_paragraphs
+        )
 
         self.root_node = amend_tree(
-            self.root_node, newline_behaviour, convert_paragraphs,
+            self.root_node,
+            newline_behaviour,
+            convert_paragraphs,
             self.paragraph_tag_class,
         )
 
 
-def amend_tree(root_node, newline_behaviour=None, convert_paragraphs=None,
-               paragraph_tag_class=None):
+def amend_tree(
+    root_node, newline_behaviour=None, convert_paragraphs=None, paragraph_tag_class=None
+):
     inst = _BaseHTMLRenderTreeParser(
-        root_node, newline_behaviour, convert_paragraphs, paragraph_tag_class)
+        root_node, newline_behaviour, convert_paragraphs, paragraph_tag_class
+    )
     inst.amend_tree()
     return inst.root_node
 
 
 StackLevel = namedtuple(
-    'TreeParserStackLevel',
-    ['tree', 'node', 'paragraph_tree', 'inside_paragraph', 'newline_behaviour',
-        'convert_paragraphs']
+    "TreeParserStackLevel",
+    [
+        "tree",
+        "node",
+        "paragraph_tree",
+        "inside_paragraph",
+        "newline_behaviour",
+        "convert_paragraphs",
+    ],
 )
 
 
 class NodeStack(object):
-
     def __init__(self):
         self.stack = []
 
@@ -436,9 +448,13 @@ class NodeStack(object):
 
 
 class _BaseHTMLRenderTreeParser(object):
-
-    def __init__(self, root_node, newline_behaviour=None,
-                 convert_paragraphs=None, paragraph_tag_class=None):
+    def __init__(
+        self,
+        root_node,
+        newline_behaviour=None,
+        convert_paragraphs=None,
+        paragraph_tag_class=None,
+    ):
 
         self.root_node = root_node
         self.stack = NodeStack()
@@ -459,8 +475,11 @@ class _BaseHTMLRenderTreeParser(object):
 
     def stack_push(self):
         self.stack.push(
-            self._tree, self._node, self._paragraph_tree,
-            self._inside_paragraph, self.newline_behaviour,
+            self._tree,
+            self._node,
+            self._paragraph_tree,
+            self._inside_paragraph,
+            self.newline_behaviour,
             self.convert_paragraphs,
         )
         self._tree = []
@@ -468,9 +487,11 @@ class _BaseHTMLRenderTreeParser(object):
         self._inside_paragraph = False
         ctx = self._node.get_context()
         self.newline_behaviour = get_newline_behaviour(
-            self.newline_behaviour, ctx.get('newline_behaviour'))
+            self.newline_behaviour, ctx.get("newline_behaviour")
+        )
         self.convert_paragraphs = get_convert_paragraphs(
-            self.convert_paragraphs, ctx.get('convert_paragraphs'))
+            self.convert_paragraphs, ctx.get("convert_paragraphs")
+        )
 
     def stack_pop(self):
         self.set_state(self.stack.pop())
@@ -489,11 +510,11 @@ class _BaseHTMLRenderTreeParser(object):
 
     @property
     def is_removing_newlines(self):
-        return self.newline_behaviour == 'remove'
+        return self.newline_behaviour == "remove"
 
     @property
     def is_converting_newlines(self):
-        return self.newline_behaviour == 'convert'
+        return self.newline_behaviour == "convert"
 
     @property
     def is_inside_paragraph(self):
@@ -529,8 +550,7 @@ class _BaseHTMLRenderTreeParser(object):
 
         # When we create the ParagraphTag and assign the tree, waaay back in
         # BaseNode we are also assigning the parent to all of the children.
-        paragraph_node = self.paragraph_tag_class(
-            {}, self._paragraph_tree, '', '')
+        paragraph_node = self.paragraph_tag_class({}, self._paragraph_tree, "", "")
         self.append_tree(paragraph_node)
         self._paragraph_tree = None
         self._inside_paragraph = False

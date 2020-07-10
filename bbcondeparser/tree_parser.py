@@ -20,23 +20,14 @@
 
 from collections import namedtuple
 
-from . import _six as six
-
+from bbcondeparser.tags import ErrorText, NewlineText, RawText, RootTag, parse_tag_set
 from bbcondeparser.token_parser import (
-    get_tokens,
-    TextToken,
     BadSyntaxToken,
+    CloseTagToken,
     NewlineToken,
     OpenTagToken,
-    CloseTagToken,
-)
-
-from bbcondeparser.tags import (
-    ErrorText,
-    RawText,
-    NewlineText,
-    parse_tag_set,
-    RootTag,
+    TextToken,
+    get_tokens,
 )
 
 
@@ -62,7 +53,8 @@ class BaseTreeParser(object):
         tags.update(ignored_tags)
 
         self.root_node = parse_tree(
-            text, tags,
+            text,
+            tags,
             raw_text_class=self.raw_text_class,
             error_text_class=self.error_text_class,
             newline_text_class=self.newline_text_class,
@@ -85,9 +77,11 @@ class BaseTreeParser(object):
 
 
 StackLevel = namedtuple(
-    'TreeParserStackLevel',
-    ['tree', 'tag_dict', 'tag_cls', 'tag_open_token', 'token_index']
+    "TreeParserStackLevel",
+    ["tree", "tag_dict", "tag_cls", "tag_open_token", "token_index"],
 )
+
+
 class TreeStack(object):
     def __init__(self):
         self.stack = []
@@ -95,7 +89,7 @@ class TreeStack(object):
     def __bool__(self):
         return len(self) > 0
 
-    __nonzero__ = __bool__ # python 2.x portability
+    __nonzero__ = __bool__  # python 2.x portability
 
     def __len__(self):
         return len(self.stack)
@@ -122,14 +116,10 @@ class TreeStack(object):
 
     def open_for_index(self, token):
         assert isinstance(token, CloseTagToken)
-        return self.find_last(
-            lambda x: x.tag_cls.tag_name == token.tag_name
-        )
+        return self.find_last(lambda x: x.tag_cls.tag_name == token.tag_name)
 
     def first_newline_close_index(self):
-        return self.find_first(
-            lambda x: x.tag_cls.close_on_newline
-        )
+        return self.find_first(lambda x: x.tag_cls.close_on_newline)
 
     def reset(self, index):
         """Clear the stack back to a certain point, and return the last
@@ -161,7 +151,7 @@ class TreeStack(object):
             min = 2
             returns 2
         """
-        assert six.callable(filter)
+        assert callable(filter)
 
         for index, item in enumerate(self.stack[min:], min):
             if filter(item):
@@ -180,9 +170,9 @@ class TreeStack(object):
             filter = lambda x: x == B
             returns 2
         """
-        assert six.callable(filter)
+        assert callable(filter)
 
-        indexes = range(len(self.stack)-1, -1, -1)
+        indexes = range(len(self.stack) - 1, -1, -1)
         items = self.stack[::-1]
 
         for index, item in zip(indexes, items):
@@ -192,16 +182,27 @@ class TreeStack(object):
 
 
 def parse_tree(
-    raw_text, tags, raw_text_class=RawText, error_text_class=ErrorText,
-    newline_text_class=NewlineText, root_tag_class=RootTag,
+    raw_text,
+    tags,
+    raw_text_class=RawText,
+    error_text_class=ErrorText,
+    newline_text_class=NewlineText,
+    root_tag_class=RootTag,
 ):
     """`raw_text` is the raw bb code (conde format) to be parsed
         `tags` should be an iterable of tag classes allowed in the text
     """
-    inst = _TreeParser(raw_text, tags, raw_text_class,
-            error_text_class, newline_text_class, root_tag_class)
+    inst = _TreeParser(
+        raw_text,
+        tags,
+        raw_text_class,
+        error_text_class,
+        newline_text_class,
+        root_tag_class,
+    )
     inst.parse_tree()
     return inst.root_node
+
 
 # This class is relatively straight forward, apart from what it does
 # when it encounters an error and has to re-evaluate tokens it's already
@@ -236,9 +237,15 @@ def parse_tree(
 # This is done differently for newline closing, tag closing ([/tagname]),
 # and encountering the end of the file.
 
+
 class _TreeParser(object):
-    def __init__(self, raw_text, tags, raw_text_class=RawText,
-        error_text_class=ErrorText, newline_text_class=NewlineText,
+    def __init__(
+        self,
+        raw_text,
+        tags,
+        raw_text_class=RawText,
+        error_text_class=ErrorText,
+        newline_text_class=NewlineText,
         root_tag_class=RootTag,
     ):
         self.raw_text_class = raw_text_class
@@ -288,19 +295,18 @@ class _TreeParser(object):
                 self.handle_eof()
 
             else:
-                raise TypeError("Unknown token type: {}".format(
-                        type(self.token)))
+                raise TypeError("Unknown token type: {}".format(type(self.token)))
 
             self.token_index += 1
 
         # Move tree from self to a root tag
-        root_tag = self.root_tag_class({}, self._tree, '', '')
+        root_tag = self.root_tag_class({}, self._tree, "", "")
         self._tree = None
         self.root_node = root_tag
 
     def handle_open_token(self):
         if self.tag_cls is None:
-            self.append_err('unknown tag')
+            self.append_err("unknown tag")
 
         elif self.tag_cls.self_closing:
             # [] because self-closing tags contain no tree
@@ -333,19 +339,19 @@ class _TreeParser(object):
             # we've short circuited the other things on the stack.
             # we'll need to start again from the first (now bad) tag.
             # (which sits at open_for_index +1)
-            if open_for_index < len(self.stack) -1:
+            if open_for_index < len(self.stack) - 1:
                 self.stack_reset(open_for_index + 1, reset=True)
-                self.append_err("open tag short-circuited by "
-                        "differing close tag")
+                self.append_err("open tag short-circuited by " "differing close tag")
 
             else:
                 tag_tree = self._tree
                 close_token = self.token
                 self.stack_pop()
-                self.append_tree(self.tag_cls(
-                    self.token.attrs, tag_tree,
-                    self.token.text, close_token.text,
-                ))
+                self.append_tree(
+                    self.tag_cls(
+                        self.token.attrs, tag_tree, self.token.text, close_token.text,
+                    )
+                )
 
     def handle_newline_token(self):
         first_newline_close = self.stack.first_newline_close_index()
@@ -358,8 +364,7 @@ class _TreeParser(object):
 
         else:
             first_non_newline_close = self.stack.find_first(
-                lambda x: not x.tag_cls.close_on_newline,
-                min=first_newline_close,
+                lambda x: not x.tag_cls.close_on_newline, min=first_newline_close,
             )
 
             if first_non_newline_close != -1:
@@ -369,8 +374,9 @@ class _TreeParser(object):
                 # at this index. So we need to go back and re-evaluate the
                 # tokens from that location.
                 self.stack_reset(first_non_newline_close, reset=True)
-                self.append_err("Open tag short-circuited by "
-                        "newline closed outer tag")
+                self.append_err(
+                    "Open tag short-circuited by " "newline closed outer tag"
+                )
             else:
                 # everything from the first close_on_newline tag on the stack
                 # to the last is a close_on_newline. So lets close them.
@@ -381,10 +387,9 @@ class _TreeParser(object):
                     tag_tree = self._tree
                     self.set_state(closed_items.pop())
 
-                    self.append_tree(self.tag_cls(
-                        self.token.attrs, tag_tree,
-                        self.token.text, '',
-                    ))
+                    self.append_tree(
+                        self.tag_cls(self.token.attrs, tag_tree, self.token.text, "",)
+                    )
 
                 # And now add our newline at the end.
                 self.append_tree(self.newline_text_class(close_token.text))
@@ -397,8 +402,9 @@ class _TreeParser(object):
             self.append_err("missing close tag")
 
     def stack_push(self):
-        self.stack.push(self._tree, self.tag_dict, self.tag_cls,
-                self.token, self.token_index)
+        self.stack.push(
+            self._tree, self.tag_dict, self.tag_cls, self.token, self.token_index
+        )
         self._tree = []
         self.tag_dict = get_new_tag_dict(self.tag_cls, self.tag_dict)
 
@@ -434,8 +440,7 @@ def get_new_tag_dict(tag_cls, tag_dict):
     allowed_tags = tag_cls.get_allowed_tags()
     if allowed_tags is not None:
         tag_dict = {
-            tag_name: tag_cls.null_class
-            for tag_name, tag_cls in tag_dict.items()
+            tag_name: tag_cls.null_class for tag_name, tag_cls in tag_dict.items()
         }
         tag_dict.update(create_tag_dict(tag_cls.allowed_tags))
 
