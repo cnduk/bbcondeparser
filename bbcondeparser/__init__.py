@@ -28,7 +28,7 @@ from .html_tags import (
 from .tags import BaseTag, ErrorText, RawText, SimpleTag, TagCategory
 from .tree_parser import BaseTreeParser
 
-__version__ = "1.1.1"
+__version__ = "2.0.0"
 
 __all__ = [
     "BaseTag",
